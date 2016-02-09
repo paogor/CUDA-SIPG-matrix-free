@@ -1,7 +1,7 @@
 CUDA SIPG matrix-free
 =====================
 
-This code solves the Poisson problem with Dirichlet borer condition with the
+This code solves the Poisson problem with Dirichlet border condition with the
 Symmetric Interior Penalty Galerkin method.
 
 The code has been written in CUDA C++.
@@ -39,6 +39,7 @@ The command `make help` shows the full list of available binaries.
 In order to build the documentation with `doxygen`  
 
 ```
+    $ mkdir doc
     $ cd source-dir
     $ make
 ```
