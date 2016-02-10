@@ -21,11 +21,14 @@ __constant__ float  d_dphi_float  [DPHI_CONST_ARRAY_LENGHT];
 
 
 /**
-  It contains functions for to manage and to access the device constant memory.
+  This namespace contains functions which manage and access the device constant memory.
 */
 namespace device_const
 {
 
+  /** This template **device** function returns the pointer to the LGL nodes saved in
+      constant memory. Only `double` and `float` are supported.
+      So, `lgl_nodes()[n]` returns (n-1)-th node value. */
   template<typename T> __device__ inline T* lgl_nodes() { return NULL; }  // dumb
 
   template<>
@@ -40,7 +43,9 @@ namespace device_const
     return d_lgl_nodes_double;
   } 
 
-
+  /** This template **device** function returns the pointer to the LGL weights saved in
+      constant memory. Only `double` and `float` are supported.
+      So, `lgl_weights()[n]` returns (n-1)-th weight value. */
   template<typename T> __device__ inline T* lgl_weights() { return NULL; }  // dumb
 
   template<>
@@ -55,8 +60,13 @@ namespace device_const
     return d_lgl_weights_double;
   } 
 
-}
 
+
+/**
+  This template function loads the LGL quadrature table to device constant memory.
+  `T` can be equal to `float` or `double`. 
+  \param order is the degree of LGL quadrature
+*/
 template<typename T>
 void load_lgl_quadrature_table( int order )
 {
@@ -97,7 +107,11 @@ void load_lgl_quadrature_table<double>( int order )
 }
 
 
-
+/**
+  This function computes the values of the basis function derivatives at the LGL nodes.
+  \param N the basis degree
+  \param values vector filled with the basis function derivatives values 
+*/
 template<typename T>
 void DbaseVALUES (int N, std::vector<T> & values)
 {
@@ -115,6 +129,12 @@ void DbaseVALUES (int N, std::vector<T> & values)
 
 // ----------------------
 
+/**
+ This template function loads the basis function derivative values to the 
+ device constant memory.
+ `T` can be equal to `float` or `double`. 
+ \param order the basis degree
+*/
 template<typename T>
 void load_Dphi_table(int order)
 {
@@ -156,10 +176,12 @@ void load_Dphi_table<float>( int order )
 
 
 
-//// WARNING Dphi need to be templatized
-
-
-
+/** This template **device** function returns the basis function `mode` derivative at
+    the `node`-th LGL node. `FLOAT_TYPE` can be equal to `float` or `double`
+    \param N basis degree
+    \param mode basis number
+    \param node number
+ */
 template<typename FLOAT_TYPE>
 inline __device__ FLOAT_TYPE Dphi(int N, int mode, int node)
 {
@@ -183,7 +205,14 @@ inline __device__ float Dphi<float>(int N, int mode, int node)
 
 // ----------------------
 
+/** This template **device** function returns the pointer to the `mode`-th
+    basis function derivative. `FLOAT_TYPE` can be equal to `float` or `double`.
+    So, `DPHI(N, 2)[3]` returns the value of the derivative of 2nd basis
+    function at the 3rd LGL node.  
+    \param N basis degree
+    \param mode basis number
 
+*/
 template<typename FLOAT_TYPE>
 inline __device__ FLOAT_TYPE * DPHI(int N, int mode)
 {
@@ -221,5 +250,8 @@ inline __device__ double * DPHI(int N, int mode)
 }
 */
 
+}  // namespace device_const
+
+using namespace device_const;
 
 #endif 
