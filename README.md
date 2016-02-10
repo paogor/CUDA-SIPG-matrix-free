@@ -36,11 +36,12 @@ Now, you can compile and run the binary you need with
 ```
 
 The command `make help` shows the full list of available binaries.
-In order to build the documentation with `doxygen`  
+
+A `Makefile` in the source root directory builds the documentation with `doxygen`  
 
 ```
-    $ mkdir doc
     $ cd source-dir
+    $ mkdir doc
     $ make
 ```
 
@@ -56,7 +57,7 @@ The most important binaries are
  * `sipg_2d_h_adaptivity` and `sipg_2d_p_adaptivity` are the two-dimensional Poisson problem validation tests. They use the GPU.
  * `sipg_sem_1d_class_validation_test` is a one-dimensional Poisson problem preliminary test. It uses the CPU and lapacke.
  * `sem_1d_nitsche_bc_validation_test` and `sem_2d_nitsche_bc_validation_test` are one and two-dimensional SEM basis validation tests. They use the CPU and lapacke. 
- * `constant_dof_change_degree_and_noe`, `flux_kernels_performance_test`, `one_iteration_of_sem_sipg_solved_on_gpu_test`, `volume_kernel_performance_test` are run with `nvprof` to test the performances 
+ * `constant_dof_change_degree_and_noe`, `flux_kernels_performance_test`, `one_iteration_of_sem_sipg_solved_on_gpu_test`, `volume_kernel_performance_test` are run with `nvprof` to test the performance. 
 
 
 
