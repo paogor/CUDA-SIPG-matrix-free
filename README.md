@@ -12,7 +12,7 @@ Requisites
  * a CUDA device with compute capability 2.0 or higher.
  * CUDA Toolkit 5.0 or higher.
  * cmake 2.8 or higher.
- * lapacke library is needed to run some preliminary validation test on CPU, it is not necessary for the solution of the problem
+ * lapacke library is needed to run some preliminary validation test on CPU, it is not necessary for the solution of the problem. The command `sudo apt-get install liblapacke-dev` install it on Debian or Ubuntu.
  * doxygen for build the documentation
   
 Build 
