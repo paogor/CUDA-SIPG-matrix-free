@@ -4,7 +4,7 @@
 #include<mode_vector.hpp>
 /**
   This abstract class provides an interface for matrix-vector product methods
-  used in iterative solvers.
+  used by iterative solvers.
   A define-problem class needs to implement this method. 
 */
 template<typename FLOAT_TYPE>

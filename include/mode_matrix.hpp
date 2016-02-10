@@ -240,8 +240,8 @@ class mode_matrix
 #include<vector>
 /**
 
-  The host_mode_matrix can handle local matrices with the Laplacian operator
-  sparsity. An object of this type can handle local operator for a given
+  The host_mode_matrix can handle local matrices.
+  An object of this type can handle local operator for a given
   number of elements. 
 
 */
@@ -251,9 +251,9 @@ class host_mode_matrix
 
   private:
 
-  INT_TYPE noe;   ///> number of mesh elements
-  INT_TYPE nompe;
-  INT_TYPE nzpr; ///>  non zero elements per row
+  INT_TYPE noe;   ///>  number of mesh elements
+  INT_TYPE nompe; ///>  number of non-zero per local matrix
+  INT_TYPE nzpr;  ///>  non zero elements per row
 
   std::vector<FLOAT_TYPE> host_matrix;
  
@@ -355,7 +355,9 @@ class host_mode_matrix
 // ===========================================================================
 
 
-
+/**
+  This function copies a `mode_matrix` from the device to the host. 
+*/
 template<typename FLOAT_TYPE, typename INT_TYPE>
 void copy ( const mode_matrix<FLOAT_TYPE, INT_TYPE> & from, 
             host_mode_matrix<FLOAT_TYPE, INT_TYPE> & to )
@@ -378,7 +380,9 @@ void copy ( const mode_matrix<FLOAT_TYPE, INT_TYPE> & from,
 }
 
 
-
+/**
+  This function copies a `mode_matrix` from the host to the device. 
+*/
 template<typename FLOAT_TYPE, typename INT_TYPE>
 void copy ( const host_mode_matrix<FLOAT_TYPE, INT_TYPE> & from, 
             mode_matrix<FLOAT_TYPE, INT_TYPE> & to )
@@ -410,16 +414,17 @@ void copy ( const host_mode_matrix<FLOAT_TYPE, INT_TYPE> & from,
 // ===========================================================================
 
 /**
-
   This class creates a host_mode_matrix containing the local Laplacian operators. 
-
 */
 template<typename FLOAT_TYPE, typename INT_TYPE>
 class host_laplacian_matrix : public  host_mode_matrix<FLOAT_TYPE, INT_TYPE>
 {
   
   public:
-
+/**
+  \param _noe number of elements
+  \param _order degree of basis functions 
+*/
   host_laplacian_matrix (INT_TYPE _noe, INT_TYPE _order)
    : host_mode_matrix<FLOAT_TYPE, INT_TYPE>( _noe, _order)
   {

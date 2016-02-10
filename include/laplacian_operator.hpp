@@ -6,6 +6,10 @@
 
 #define SEM_FUNC sem_function<FLOAT_TYPE>
 
+/**
+ The class defines the mono-dimensional Laplace operator.
+ *This class is used for tests.*
+*/
 template<typename FLOAT_TYPE>
 class laplace_1d : public SEM_FUNC
 {
@@ -14,6 +18,12 @@ class laplace_1d : public SEM_FUNC
 
   laplace_1d(int degree) : SEM_FUNC(degree) {};
 
+  /**
+
+  /param i row
+  /param j col
+  /return (i,j) value of Laplace operator
+  */
   FLOAT_TYPE operator() (int i, int j)
   {
    
@@ -30,7 +40,10 @@ class laplace_1d : public SEM_FUNC
 
 };  
 
-
+/**
+ The class defines the two-dimensional Laplace operator.
+ *This class is used for tests.*
+*/
 template<typename FLOAT_TYPE>
 class laplace_2d : public SEM_FUNC
 {
@@ -39,7 +52,14 @@ class laplace_2d : public SEM_FUNC
 
   laplace_2d(int degree) : SEM_FUNC(degree) {};
 
+  /**
 
+  \param i1
+  \param i2
+  \param j1
+  \param j2
+  \return ([i1,i2],[j1,j2]) value of Laplace operator
+  */
   FLOAT_TYPE operator() (int i1, int i2, int j1,  int j2)
   {
     

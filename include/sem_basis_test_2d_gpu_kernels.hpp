@@ -7,9 +7,10 @@
 #include<volume_gpu_kernels.hpp>
 
 
-/** This namespace contains the kernels for test SEM basis. 
-    They solve a Poisson problem on a single square element
-    with Nitsche boundary conditions.
+/** This namespace contains **kernels** which tests SEM basis. 
+    These kernels solve a Poisson problem on a single square element
+    with Nitsche boundary conditions. ONLY for TESTS VALUES of
+    basis function derivatives. 
 */
 namespace sem_2d_test_namespace
 {
