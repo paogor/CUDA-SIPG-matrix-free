@@ -29,7 +29,11 @@ void copy ( const host_mode_vector<FLOAT_TYPE, INT_TYPE> & from,
 // ===========================================================================
 
 
-
+/**
+  This class store the degree of freedom vector on the *device* for a
+  two-dimension mesh. `FLOAT_TYPE` is the data type. `INT_TYPE` is the index
+  type [always `int`]
+*/
 template<typename FLOAT_TYPE, typename INT_TYPE>
 class mode_vector
 {
@@ -37,10 +41,9 @@ class mode_vector
   private:
 
   INT_TYPE noe;   ///> number of mesh elements
-  INT_TYPE nompe; ///> max number of modes per mesh element for SEM = (N+1)
-                  ///  per dimension
+  INT_TYPE nompe; ///> max number of modes per mesh element per coordinate direction. For example SEM = (N+1)
 
-  FLOAT_TYPE * device_array;
+  FLOAT_TYPE * device_array; ///> pointer to data in the device
 
   public:
 
@@ -51,7 +54,12 @@ class mode_vector
   {}
 
 
- 
+  /**
+    This constructor allocate data on device memory.
+
+    \param _noe number of mesh elements
+    \param _nompe number of modes per mesh element per coordinate direction.
+  */ 
   __host__ mode_vector (INT_TYPE _noe, INT_TYPE _nompe)
                        : noe(_noe), nompe(_nompe)
   {
@@ -60,7 +68,13 @@ class mode_vector
   }
 
 
-
+  /**
+    This constructor map a device memory location already present.
+ 
+    \param _noe number of mesh elements
+    \param _nompe number of modes per mesh element per coordinate direction.
+    \param _d_a pointer pointing to device memory
+  */
   __host__ mode_vector ( INT_TYPE _noe,
                          INT_TYPE _nompe,
                          FLOAT_TYPE * _d_a )
@@ -70,6 +84,9 @@ class mode_vector
   {}
 
 
+  /**
+    Copy constructor. It copy data from host to device.
+  */
   __host__ 
   mode_vector ( const host_mode_vector<FLOAT_TYPE, INT_TYPE> &  hmv )
               : device_array(NULL)
@@ -80,7 +97,14 @@ class mode_vector
 
   // -----------------------------------------------------------------------
 
-  
+
+  /**
+    This operator returns the data. It is called from the *device*.
+
+    \param i1 mode in x-coord
+    \param i2 mode in y-coord
+    \param e_idx mesh element 
+  */ 
   __device__ inline FLOAT_TYPE & operator() (INT_TYPE i1,
                                              INT_TYPE i2,
                                              INT_TYPE e_idx)
@@ -119,13 +143,17 @@ class mode_vector
 
   // -----------------------------------------------------------------------
 
-
+  /**
+   This method returns the number of mesh elements.
+  */
   __device__ __host__ inline INT_TYPE get_noe() const
   {
     return noe;
   }
 
-
+  /**
+   This method returns the number of modes per mesh elements.
+  */
   __device__ __host__ inline INT_TYPE get_nompe() const
   {
     return nompe;
@@ -171,6 +199,11 @@ class mode_vector
 
 #include<vector>
 
+/**
+  This class store the degree of freedom vector on *host* for a two-dimension
+  mesh. `FLOAT_TYPE` is the data type. `INT_TYPE` is the index type [always
+  `int`]
+*/
 template<typename FLOAT_TYPE, typename INT_TYPE>
 class host_mode_vector
 {
@@ -178,10 +211,9 @@ class host_mode_vector
   private:
 
   INT_TYPE noe;   ///> number of mesh elements
-  INT_TYPE nompe; ///> max number of modes per mesh element for SEM = (N+1)
-                  ///  per dimension
+  INT_TYPE nompe; ///> max number of modes per mesh element per coordinate direction. For example SEM = (N+1)
 
-  std::vector<FLOAT_TYPE> host_vector;
+  std::vector<FLOAT_TYPE> host_vector; ///> contains the data
 
   public:
 
@@ -192,6 +224,11 @@ class host_mode_vector
   {}
 
  
+  /**
+
+    \param _noe number of mesh elements
+    \param _nompe number of modes per mesh element per coordinate direction.
+  */ 
   host_mode_vector (INT_TYPE _noe, INT_TYPE _nompe)
                    : noe(_noe),
                      nompe(_nompe),
@@ -234,6 +271,13 @@ class host_mode_vector
 
   // -----------------------------------------------------------------------
  
+  /**
+    This operator returns the data.
+
+    \param i1 mode in x-coord
+    \param i2 mode in y-coord
+    \param e_idx mesh element 
+  */ 
   inline FLOAT_TYPE & operator() (INT_TYPE i1,
                                   INT_TYPE i2,
                                   INT_TYPE e_idx)
