@@ -31,21 +31,25 @@
 
 #define __QUADRILATERAL_MESH_INFO__
 
-
+/**
+ This class builds (on host) the data sets which describes
+ a two-dimensional Cartesian mesh on (0,1)X(0,1).
+ `FLOAT_TYPE` is the floating point data type employed.
+*/
 template<typename FLOAT_TYPE>
 class square_mesh
 {
   private:
     int _dim; //< number of elements along the edge
-    int _noe; //< _noe = _dim * _dim
+    int _noe; //< the total number of mesh element _noe = _dim * _dim
 
 #ifndef  __QUADRILATERAL_MESH_INFO__
     std::vector<int> _neighbourhood;
     void compute_neighbours();
 #endif
 
-    std::vector<FLOAT_TYPE> _x_coord;
-    std::vector<FLOAT_TYPE> _y_coord;
+    std::vector<FLOAT_TYPE> _x_coord; //< vector of x coordinates of mesh elements
+    std::vector<FLOAT_TYPE> _y_coord; //< vector of y coordinates of mesh elements
 
     void compute_coordinates();
 
@@ -53,13 +57,17 @@ class square_mesh
   public:
 
 #ifdef  __QUADRILATERAL_MESH_INFO__
-    quadrilateral_mesh_info<FLOAT_TYPE> device_info;
+    quadrilateral_mesh_info<FLOAT_TYPE> device_info; //< mesh information on device
 #else
     mesh_info<FLOAT_TYPE> device_info;
 #endif
 
     square_mesh() {}
 
+/**
+  
+  \param dim  number of elements per edge
+*/
     square_mesh(int dim)
        : _dim(dim),
          _noe(dim*dim),
@@ -232,7 +240,9 @@ void square_mesh<FLOAT_TYPE>::compute_neighbours()
 
 #endif
 
-
+/**
+  This method computes the coordinates of mesh elements.
+*/
 template<typename FLOAT_TYPE>
 void square_mesh<FLOAT_TYPE>::compute_coordinates()
 {

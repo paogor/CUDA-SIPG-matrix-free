@@ -55,9 +55,10 @@ neighbor LEFT   4
 */
 
 /** 
-mesh information for quadrilateral elements
+ A generic mesh information structure (on **device**) for quadrilateral
+ elements.
+ For now deprecated, use `quadrilateral_mesh_info` instead.
 */
-
 template<typename FLOAT_TYPE>
 class mesh_info
 {
@@ -162,17 +163,21 @@ class mesh_info
 
 };
 
-
+/**
+ A generic mesh information structure (on **device**) for quadrilateral
+ elements.
+ `FLOAT_TYPE` is the float point data type of element coordinates.
+*/
 template<typename FLOAT_TYPE>
 class quadrilateral_mesh_info
 {
 
   private: 
 
-  int dimx;
-  int dimy;
+  int dimx; ///> number of elements on the x coord
+  int dimy; ///> number of elements on the y coord
 
-  int noe; ///> number of elements in the mesh
+  int noe; ///> total number of elements in the mesh noe = dimx*dimy
 
   FLOAT_TYPE * x; ///> poiter to an array of size (num_of_elem * 4)
                   /// x[c*noe + e] is the x_c coordinate of element number e 
@@ -180,7 +185,14 @@ class quadrilateral_mesh_info
 
   public:
 
-  __host__ quadrilateral_mesh_info ( int _dimy, int _dimx,
+/**
+
+  \param _dimy number of elements on the y coord
+  \param _dimx number of elements on the x coord
+  \param h_x hosts pointer to x coords of the mesh elements
+  \param h_y hosts pointer to y coords of the mesh elements
+*/
+  __host__ quadrilateral_mesh_info ( int _dimx, int _dimy,
                                      FLOAT_TYPE * h_x,
                                      FLOAT_TYPE * h_y )
                                    : noe(_dimx*_dimy), dimx(_dimx), dimy(_dimy)  
@@ -260,25 +272,36 @@ class quadrilateral_mesh_info
 
   // ---------------------------------------------------------
 
-  
+  /** 
+   \return index of the neighbor at the bottom
+  */ 
   __host__ __device__ inline int
   get_neighborhood_DOWN (int x, int y) const
   {
     return ( dimy-1 == y ? -1 : dimx*(y+1) + x );
   }
-  
+
+  /** 
+   \return index of the neighbor at the right
+  */  
   __host__ __device__ inline int 
   get_neighborhood_RIGHT (int x, int y) const
   {
     return ( dimx-1 == x ? -2 : dimx*y + x + 1 ); 
   }
-  
+
+  /** 
+   \return index of the neighbor at the top
+  */ 
   __host__ __device__ inline int 
   get_neighborhood_UP (int x, int y) const
   {
     return ( 0 == y ? -3 : dimx*(y-1) + x );
   }
   
+  /** 
+   \return index of the neighbor at the left
+  */ 
   __host__ __device__ inline int
   get_neighborhood_LEFT (int x, int y) const
   {
@@ -301,7 +324,12 @@ class quadrilateral_mesh_info
 };
 
 
-/* non-tested code follows */
+// non-tested code follows 
+/**
+ A generic mesh information structure (on **device**) for quadrilateral
+ elements for **multigpu**.
+ `FLOAT_TYPE` is the float point data type of element coordinates.
+*/
 template<typename FLOAT_TYPE>
 class local_quadrilateral_mesh_info : public quadrilateral_mesh_info<FLOAT_TYPE> 
 {
