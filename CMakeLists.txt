@@ -9,6 +9,9 @@ add_executable(plot_basis validation_tests/sem_basis/plot_basis.cpp)
 set( COMPUTE_CAPABILITY "sm_21" CACHE STRING "Set the device compute capability: sm_20, sm_35 ..." )
 list( APPEND CUDA_NVCC_FLAGS -arch=${COMPUTE_CAPABILITY} )
 
+set( GCL_USAGE "OFF" CACHE BOOL "Set ON in order to employ GCL library" )
+set( GCL_SOURCE_DIR "../gcl/trunk" CACHE STRING "Set the GCL source directory" )
+
 include_directories("include/")
 
 
@@ -31,8 +34,7 @@ endforeach()
 
 set( SIPG_VALIDATION_EXECUTABLES
       sipg_2d_h_adaptivity
-      sipg_2d_p_adaptivity
-      sipg_2d_multigpu )
+      sipg_2d_p_adaptivity )
 
 foreach( EXEC ${SIPG_VALIDATION_EXECUTABLES} )
   cuda_add_executable( ${EXEC} validation_tests/sipg_sem/${EXEC}.cu)
@@ -63,10 +65,36 @@ target_link_libraries(sem_2d_nitsche_bc_validation_test lapack_wrapper)
 
 
 
-### VALIDATION tests OTHERS
+### VALIDATION tests GCL 
 
 
+if( "${GCL_USAGE}" STREQUAL "ON" )
 
+  find_package( Boost )
+    if( Boost_FOUND )
+    include_directories( ${Boost_INCLUDE_DIR} )
+  endif()
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GCL_GPU_ -D_GCL_MPI_ -DNDEBUG")
+
+  include_directories( "${GCL_SOURCE_DIR}/L3/include/" ) ## Library header files
+  include_directories( "${GCL_SOURCE_DIR}/L3/src/" )     ## Library source files
+  include_directories( "${GCL_SOURCE_DIR}/L2/include/" ) ## Library header files
+  include_directories( "${GCL_SOURCE_DIR}/L2/src/" )     ## Library source files
+  include_directories( "${GCL_SOURCE_DIR}" )             ## Library header files
+
+  ADD_LIBRARY( gcl STATIC "${GCL_SOURCE_DIR}/L3/include/GCL.h"
+                          "${GCL_SOURCE_DIR}/L2/include/stats_collector.h"
+                          "${GCL_SOURCE_DIR}/L3/src/GCL.cpp" )
+
+
+  cuda_add_executable( sipg_2d_h_adaptivity_multigpu validation_tests/sipg_sem/sipg_2d_h_adaptivity_multigpu.cu )
+  add_dependencies( sipg_2d_h_adaptivity_multigpu gcl ) 
+  cuda_add_cublas_to_target( sipg_2d_h_adaptivity_multigpu )
+  target_link_libraries( sipg_2d_h_adaptivity_multigpu gcl ${CUDA_MPI_LIB} )
+
+
+endif()
 
 
 ### DOC
