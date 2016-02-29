@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(the_code)
+project(CUDA-Matrix-Free-SIPG)
 
 find_package(CUDA REQUIRED)
 
@@ -31,7 +31,8 @@ endforeach()
 
 set( SIPG_VALIDATION_EXECUTABLES
       sipg_2d_h_adaptivity
-      sipg_2d_p_adaptivity )
+      sipg_2d_p_adaptivity
+      sipg_2d_multigpu )
 
 foreach( EXEC ${SIPG_VALIDATION_EXECUTABLES} )
   cuda_add_executable( ${EXEC} validation_tests/sipg_sem/${EXEC}.cu)
@@ -40,10 +41,10 @@ endforeach()
 
 cuda_add_executable( multigpu_mesh_test validation_tests/mesh/multigpu_mesh_test.cu )
 cuda_add_executable( rhs_test validation_tests/mesh/rhs_test.cu )
+cuda_add_executable( dotproduct_multigpu_test validation_tests/mesh/dotproduct_multigpu_test.cu )
 
 
-
-### VALIDATION tests LAPACK
+## VALIDATION tests LAPACK
 
 ## lapack wrapper
 
