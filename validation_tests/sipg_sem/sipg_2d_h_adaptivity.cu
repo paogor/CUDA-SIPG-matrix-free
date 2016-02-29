@@ -17,6 +17,7 @@
 #include<sipg_sem_2d.hpp>
 
 #include<iomanip>
+#include<CUDA_TIMER.hpp>
 
 int main()
 {
@@ -34,12 +35,15 @@ int main()
   double L2_err_old(0), H1_err_old(0);
   
 
-  for (int dim = 4; dim < 129; dim*=2)
+  for (int dim = 2048; dim < 2049; dim*=2)
   {
 
+    CUDA_TIMER t;
     using namespace test_func;
+    t.start();
     square_mesh<double> sq_mesh(dim);
     sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
+    t.stop();
 
     std::cout<<dim<<"\t"<<degree<<"\t";
     std::cout<<std::setw(12)<<log(p.H1_err/H1_err_old)/log(2)<<"\t";
@@ -48,6 +52,7 @@ int main()
     std::cout<<std::setw(12)<<p.L2_err<<"\t";
     std::cout<<std::setw(12)<<p.max_err;
 //    std::cout<<"\t"<<it;
+    std::cout<<"\t"<<t.elapsed_millisecs();
     std::cout<<std::endl;
 
 

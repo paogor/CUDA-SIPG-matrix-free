@@ -382,6 +382,9 @@ class local_quadrilateral_mesh_info : public quadrilateral_mesh_info<FLOAT_TYPE>
 
   // ---------------------------------------------------------
 
+
+  // +++++++++++++++++++++ (x,y) index does not consider the halos +++++++++++++++++++++ 
+
   
   __host__ __device__ inline int
   get_neighborhood_DOWN (int x, int y) const

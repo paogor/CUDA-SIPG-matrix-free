@@ -1,8 +1,9 @@
 #ifndef __CONJUGATE_GRADIENT_MULTIGPU_HPP__
 #define __CONJUGATE_GRADIENT_MULTIGPU_HPP__
 
-#include<abs_mvm.hpp>
+#include<abs_mvm_multigpu.hpp>
 #include<cublas_wrapper.hpp>
+
 
 /*
 
@@ -21,17 +22,15 @@
 */
 
 template<typename FLOAT_TYPE>
-int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem, 
+int conjugate_gradient_multigpu ( abs_mvm_multigpu<FLOAT_TYPE> & problem, 
                          mode_vector<FLOAT_TYPE,int> x,
                          mode_vector<FLOAT_TYPE,int> b,
-                         FLOAT_TYPE tol=1e-15)
+                         FLOAT_TYPE tol=1e-14)
 {
-
   const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
 
   const int noe = x.get_noe();
   const int nompe = x.get_nompe();
-
 
   /* allocating space on device */
   mode_vector<FLOAT_TYPE, int> r(noe, nompe), p(noe, nompe), Ap(noe, nompe);
@@ -40,13 +39,12 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
   cublasCreate(&handle); 
 
   // compute the L2-norm of b (to stop iterations)
-  FLOAT_TYPE norm_b;
-  cublas_dot(handle, b.size(), b.data(), 1, b.data(), 1, &norm_b);
+  FLOAT_TYPE norm_b = problem._dot_product(b,b);
   norm_b = sqrt(norm_b);
 
   // r = b 
-
-  // p = b 
+  cudaMemcpy (r.data(), b.data(), b.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice);
+  // p = r 
   cudaMemcpy (p.data(), r.data(), r.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice);
 
 
@@ -54,16 +52,16 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
   FLOAT_TYPE pAp = .0;
 
   /* compute r*r */
-  cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_old);
+  rr_old = problem._dot_product(r,r);
 
 //  std::cerr<<"rr_old "<<rr_old<<std::endl;
 
-  const FLOAT_TYPE stop = norm_b*tol;
+  const FLOAT_TYPE stop = norm_b*tol * norm_b*tol;
   const int max_it = 10e8; // max iterations
   int it = 0; // iteration count
 
 
-  while ( sqrt(rr_old)>stop && it < max_it )
+  while ( /*sqrt*/(rr_old)> stop && it < max_it )
   {
 
     /* compute Ap */
@@ -71,10 +69,10 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
     // SYNC p
 
     // Ap = A*p
-    problem._mvm(p, Ap);
+    problem._mvm(p);
     //
-
-    cublas_dot(handle, p.size(), p.data(), 1, Ap.data(), 1, &pAp);
+   
+    pAp = problem._dot_product(problem._mvm_output(), p);
 
     // REDUCE sum pAp
 
@@ -86,8 +84,8 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
 
 
     // r 
-    cublas_axpy(handle, Ap.size(), &minus_alpha, Ap.data(), 1, r.data(), 1);
-    cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_new);
+    cublas_axpy(handle, problem._mvm_output().size(), &minus_alpha, problem._mvm_output().data(), 1, r.data(), 1);
+    rr_new = problem._dot_product(r,r);
 
     // REDUCE sum rr_new
 
@@ -102,7 +100,10 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
     rr_old = rr_new;
     ++it;
 
+
   }   
+
+//  std::cerr<<it<<": rr_old "<<rr_old<<std::endl;
 
   /* free space */
   cublasDestroy(handle);
@@ -112,6 +113,7 @@ int conjugate_gradient_multigpu ( const abs_mvm<FLOAT_TYPE> & problem,
   Ap.free();
 
   return it;
+
 }
 
 

@@ -2,37 +2,9 @@
 #include<mode_vector.hpp>
 
 
-template<typename T>
-T u_ex (T x, T y)
-{
-  const T PI = 3.14159265359;
-//  return x*y*(y-1)*(x-1)*std::exp(x-y);   // A
-//  return x*(1-x)*std::exp(3*x)*std::sin(2*PI*y);  // B
-//  return y*(1-y)*x*x*x; // C
-
-//  return x*x*y*y; //D
-
-  return std::cos(8*PI*x) + std::cos(8*PI*y); //E
-
-}
-
-
-
-template<typename T>
-T f (T x, T y)
-{
-  const T PI = 3.14159265359;
-//  return -2*x*(y-1)*(y-2*x+x*y+2)*std::exp(x-y); // A
-//  return -std::sin(2*PI*y)*std::exp(3*x)*((4-3*x-9*x*x)-4*PI*PI*(x-x*x)); // B
-//  return 2*x*x*x - 6*x*y*(1-y); // C 
-
-//  return -2*y*y -2*x*x; //D
-
-  return 64*PI*PI*std::cos(8*PI*x) + 64*PI*PI*std::cos(8*PI*y); //E
-
-//  return 1.;
-}
-
+#define EXACT_SOLUTION_NO 1
+#include"../analytical_solutions.hpp"
+using namespace test_func;
 
 #include<rhs.hpp>
 

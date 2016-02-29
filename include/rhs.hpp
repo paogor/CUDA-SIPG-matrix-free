@@ -7,7 +7,7 @@
 
 
 
-/** TODO fix u_ex an f (may use a functor ?)*/
+/** **DEPRECATED** This function has been rewrote as `sipg_2d` method */
 
 
 template<typename T>

@@ -305,10 +305,10 @@ class square_mesh_multigpu
   private:
 
     int _local_dim; //< number of element per node _with_ _halos_
-    int _total_dim; //< edge dimension of the entire (all node) mesh
-    int _grid_size;
-    int _grid_coord_x;
-    int _grid_coord_y;
+    int _total_dim; //< total number of elements on the edge of the entire (all node) mesh
+    int _grid_size; //< number of tails per edge 
+    int _grid_coord_x; // need to be < _grid_size 
+    int _grid_coord_y; // need to be < _grid_size 
 
     bool _DOWNborder;
     bool _RIGHTborder;
@@ -324,6 +324,8 @@ class square_mesh_multigpu
   public:
 
     local_quadrilateral_mesh_info<FLOAT_TYPE> device_info;
+
+    square_mesh_multigpu() {}
 
     square_mesh_multigpu( int local_dim_without_halos,
                           int grid_size,
@@ -355,9 +357,8 @@ class square_mesh_multigpu
 
       device_info = m;
 
-       
-
     }
+
 
     inline int dim() const
     {
@@ -369,10 +370,31 @@ class square_mesh_multigpu
       return _local_dim;
     }
 
-
+    /**
+     number of elements of the tile
+    */
     inline int noe() const
     {
       return _local_dim*_local_dim;
+    }
+
+
+    /** 
+      \return number of tails per edge
+    */
+    inline int grid_size() const
+    {
+      return _grid_size; 
+    }
+ 
+    inline int grid_coord_x() const
+    {
+      return _grid_coord_x;
+    }
+ 
+    inline int grid_coord_y() const
+    {
+      return _grid_coord_y;
     }
 
 
