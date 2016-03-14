@@ -15,6 +15,11 @@ set( GCL_SOURCE_DIR "../gcl/trunk" CACHE STRING "Set the GCL source directory" )
 include_directories("include/")
 
 
+## lapack wrapper
+add_library(lapack_wrapper STATIC include/lapack_wrapper.cpp)
+target_link_libraries(lapack_wrapper lapacke) # lapacke lib must be in the search path
+
+
 
 ### PERFORMANCE tests
 
@@ -39,6 +44,7 @@ set( SIPG_VALIDATION_EXECUTABLES
 foreach( EXEC ${SIPG_VALIDATION_EXECUTABLES} )
   cuda_add_executable( ${EXEC} validation_tests/sipg_sem/${EXEC}.cu)
   cuda_add_cublas_to_target( ${EXEC} )
+  target_link_libraries(${EXEC} lapack_wrapper)
 endforeach()
 
 cuda_add_executable( multigpu_mesh_test validation_tests/mesh/multigpu_mesh_test.cu )
@@ -47,11 +53,6 @@ cuda_add_executable( dotproduct_multigpu_test validation_tests/mesh/dotproduct_m
 
 
 ## VALIDATION tests LAPACK
-
-## lapack wrapper
-
-add_library(lapack_wrapper STATIC include/lapack_wrapper.cpp)
-target_link_libraries(lapack_wrapper lapacke) # lapacke lib must be in the search path
 
 
 add_executable(sipg_sem_1d_class_validation_test validation_tests/sipg_sem/sipg_sem_1d_class_validation_test.cpp)
@@ -63,6 +64,8 @@ target_link_libraries(sem_1d_nitsche_bc_validation_test lapack_wrapper)
 add_executable(sem_2d_nitsche_bc_validation_test validation_tests/sem_basis/sem_2d_nitsche_bc_validation_test.cpp)
 target_link_libraries(sem_2d_nitsche_bc_validation_test lapack_wrapper)
 
+add_executable(diagonal_block_inversion validation_tests/sem_basis/diagonal_block_inversion.cpp)
+target_link_libraries(diagonal_block_inversion lapack_wrapper)
 
 
 ### VALIDATION tests GCL 
@@ -92,6 +95,12 @@ if( "${GCL_USAGE}" STREQUAL "ON" )
   add_dependencies( sipg_2d_h_adaptivity_multigpu gcl ) 
   cuda_add_cublas_to_target( sipg_2d_h_adaptivity_multigpu )
   target_link_libraries( sipg_2d_h_adaptivity_multigpu gcl ${CUDA_MPI_LIB} )
+
+
+  cuda_add_executable( multigpu-mvm performance_tests/multigpu-mvm.cu )
+  add_dependencies( multigpu-mvm gcl ) 
+  cuda_add_cublas_to_target( multigpu-mvm )
+  target_link_libraries( multigpu-mvm gcl ${CUDA_MPI_LIB} )
 
 
 endif()

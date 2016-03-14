@@ -12,6 +12,10 @@
 #include<dotproduct_multigpu.hpp>
 #include<halo_exchange.h>
 
+#ifdef USE_MODE_MATRIX
+  #include<mode_matrix_kernels.hpp>
+#endif
+
 #include<conjugate_gradient_multigpu.hpp>
 
 /**
@@ -35,6 +39,10 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
 
     mode_vector<FLOAT_TYPE,int> output;
 
+#ifdef USE_MODE_MATRIX
+    mode_matrix<FLOAT_TYPE, int> d_volume_matrix; 
+#endif
+
     FLOAT_TYPE pen; 
 
 
@@ -55,6 +63,12 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
 
     pattern_type he;
     GCL::field_on_the_fly<FLOAT_TYPE, layoutmap, pattern_type::traits> field_gpu;
+
+    dim3 volume_gridSIZE;
+    dim3 volume_blockSIZE;
+
+    dim3 flux_gridSIZE;
+    dim3 flux_blockSIZE;
 
   public:
 
@@ -89,6 +103,29 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
 
       const int noe = _mesh.noe();
       order = _order;
+      
+      // define block sizes
+
+      const int vec_noe = output.get_noe();
+      const int blockD = 128;
+      volume_gridSIZE = dim3( (vec_noe + blockD - 1)/blockD , order+1, order+1);
+      volume_blockSIZE = dim3(128, 1, 1); 
+
+      const int dimx = mesh.device_info.get_dimx();
+      const int dimy = mesh.device_info.get_dimy();
+      const int blockDx = 32;
+      const int blockDy = 4;
+
+      flux_gridSIZE = dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 );
+      flux_blockSIZE = dim3( blockDx, blockDy, 1 );
+
+ 
+#ifdef USE_MODE_MATRIX
+      host_laplacian_matrix<FLOAT_TYPE,int> h_volume_matrix(1, order);
+      d_volume_matrix = h_volume_matrix;
+#endif
+
+
       // initialize
       load_Dphi_table<FLOAT_TYPE>(order);
       load_lgl_quadrature_table<FLOAT_TYPE>(order);
@@ -113,8 +150,9 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
 
 #endif
 
-
       compute_rhs(f, u_ex);
+
+#ifndef __MVM_MULTIGPU_TEST__
       copy(h_xx, d_u);
 
       int it = conjugate_gradient_multigpu(*(this), d_u, d_rhs);
@@ -123,11 +161,14 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
       copy(d_u, solution);
 
       err_norms(solution, f, u_ex, dx_u_ex, dy_u_ex);
-
+#endif
     }
 
     ~sipg_sem_2d_multigpu ()
     {
+#ifdef USE_MODE_MATRIX
+      d_volume_matrix.free();
+#endif
       d_rhs.free();
       d_u.free();
       output.free();
@@ -141,26 +182,22 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
     int _mvm ( mode_vector<FLOAT_TYPE,int> input)
     {
  
-      const int noe = input.get_noe();
-      const int blockD = 128;
-
+#ifdef USE_MODE_MATRIX
+      volume_mvm <FLOAT_TYPE, 1>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
+      ( order, d_volume_matrix, input, output ); 
+#else
       volume<FLOAT_TYPE>
-      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
       ( order, input, output ); 
-
-      const int dimx = mesh.device_info.get_dimx();
-      const int dimy = mesh.device_info.get_dimy();
-      const int blockDx = 32;
-      const int blockDy = 4;
+#endif
 
       local_flux_term6a<FLOAT_TYPE>
-      <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
-          dim3( blockDx, blockDy, 1 ) >>>
+      <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output );
 
       local_flux_term6b<FLOAT_TYPE>
-      <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
-          dim3( blockDx, blockDy, 1 ) >>>
+      <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output );
 
       // use GCL in order to exchange output HALOS  

@@ -16,9 +16,10 @@
 
 #include<mpi.h>
 
-#define MPI_NODE_PER_EDGE 4
+#define USE_MODE_MATRIX
+#define MPI_NODE_PER_EDGE 2
 
-#define EXACT_SOLUTION_NO 1
+#define EXACT_SOLUTION_NO 5
 #include"../analytical_solutions.hpp"
 
 #include<sipg_sem_2d_multigpu.hpp>
@@ -41,7 +42,10 @@ int main(int argc, char** argv)
   {
     std::cerr<<"EXACT_SOLUTION_NO "<<EXACT_SOLUTION_NO<<std::endl;
     std::cerr<<"MPI_NODE_PER_EDGE "<<MPI_NODE_PER_EDGE<<std::endl;
-  }
+#ifdef USE_MODE_MATRIX
+    std::cout<<"USE_MODE_MATRIX is ON"<<std::endl;
+#endif
+}
 
   int dims[3] = {MPI_NODE_PER_EDGE, MPI_NODE_PER_EDGE, 1};
   int period[3] = {0, 0, 0};
@@ -52,45 +56,45 @@ int main(int argc, char** argv)
   MPI_Cart_get(CartComm, 3, dims, period, coords);
 
 
-  int degree = 5;
-
-//  for (int degree = 2; degree < 6; ++degree)
-  {
-  double L2_err_old(0), H1_err_old(0);
-
-  for (int dim = 4; dim < 259; dim*=2)
+  for (int degree = 2; degree < 9; ++degree)
   {
 
-    CUDA_TIMER t;
-    using namespace test_func;
-    if (pid == 0) t.start();
-    square_mesh_multigpu<double> sq_mesh( dim, MPI_NODE_PER_EDGE, coords[0], coords[1] ); 
-    sipg_sem_2d_multigpu<double> p(CartComm, degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
-    if (pid == 0) t.stop();
+    double L2_err_old(0), H1_err_old(0);
 
-
-    if(pid == 0)
+    for (int dim = 4; dim < 129; dim*=2)
     {
 
-      std::cerr<<MPI_NODE_PER_EDGE*dim<<"\t"<<degree<<"\t";
-      std::cerr<<std::setw(12)<<log(p.H1_err/H1_err_old)/log(2)<<"\t";
-      std::cerr<<std::setw(12)<<p.H1_err<<"\t";
-      std::cerr<<std::setw(12)<<log(p.L2_err/L2_err_old)/log(2)<<"\t";
-      std::cerr<<std::setw(12)<<p.L2_err<<"\t";
-      std::cerr<<t.elapsed_millisecs();
-      std::cerr<<std::endl;
+      CUDA_TIMER t;
+      using namespace test_func;
+      square_mesh_multigpu<double> sq_mesh( dim, MPI_NODE_PER_EDGE, coords[0], coords[1] ); 
 
-      L2_err_old = p.L2_err;
-      H1_err_old = p.H1_err;
+      if (pid == 0) t.start();
+      sipg_sem_2d_multigpu<double> p(CartComm, degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
+      if (pid == 0) t.stop();
 
-    }
 
-    sq_mesh.device_info.free();
+      if(pid == 0)
+      {
 
-  }
+        std::cerr<<MPI_NODE_PER_EDGE*dim<<"\t"<<degree<<"\t";
+        std::cerr<<std::setw(12)<<log(p.H1_err/H1_err_old)/log(2)<<"\t";
+        std::cerr<<std::setw(12)<<p.H1_err<<"\t";
+        std::cerr<<std::setw(12)<<log(p.L2_err/L2_err_old)/log(2)<<"\t";
+        std::cerr<<std::setw(12)<<p.L2_err<<"\t";
+        std::cerr<<t.elapsed_millisecs();
+        std::cerr<<std::endl;
 
+        L2_err_old = p.L2_err;
+        H1_err_old = p.H1_err;
+
+      }
+ 
+      sq_mesh.device_info.free();
+
+   }
 
   if (pid == 0) std::cerr<<std::endl;
+
 }
 
 

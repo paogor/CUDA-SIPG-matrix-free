@@ -8,9 +8,11 @@
 *
 */
 
+#define USE_PRECONDITIONER 
+
 #include<iostream>
 
-#define EXACT_SOLUTION_NO 5
+#define EXACT_SOLUTION_NO 1
 #include"../analytical_solutions.hpp"
 
 #define USE_MODE_MATRIX
@@ -28,21 +30,27 @@ int main()
   std::cout<<"USE_MODE_MATRIX is ON"<<std::endl;
 #endif
 
-  int degree = 4;
+#ifdef USE_PRECONDITIONER 
+  std::cout<<"USE_PRECONDITIONER is ON"<<std::endl;
+#endif
 
-//  for (int degree = 2; degree < 4; ++degree)
+
+
+  int degree = 8;
+
+//  for (int degree = 2; degree < 9; ++degree)
   {
   double L2_err_old(0), H1_err_old(0);
   
 
-  for (int dim = 2048; dim < 2049; dim*=2)
+  for (int dim = 4; dim < 129; dim*=2)
   {
 
     CUDA_TIMER t;
     using namespace test_func;
     t.start();
     square_mesh<double> sq_mesh(dim);
-    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
+    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex, 100*degree*degree);
     t.stop();
 
     std::cout<<dim<<"\t"<<degree<<"\t";
@@ -53,6 +61,7 @@ int main()
     std::cout<<std::setw(12)<<p.max_err;
 //    std::cout<<"\t"<<it;
     std::cout<<"\t"<<t.elapsed_millisecs();
+    std::cout<<"\t"<<p.iterations;
     std::cout<<std::endl;
 
 

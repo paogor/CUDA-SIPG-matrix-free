@@ -9,11 +9,16 @@
 #include<sipg_sem_2d_gpu_kernels.hpp>
 #include<build_square_mesh.hpp>
 
-//#include<../performance_tests/flux_kernels_optim.hpp>
+#include<../performance_tests/flux_kernels_optim.hpp>
 
 #ifdef USE_MODE_MATRIX
   #include<mode_matrix_kernels.hpp>
 #endif
+
+#ifdef USE_PRECONDITIONER
+  #include<mode_matrix_kernels.hpp>
+#endif
+
 
 /**
   This class solves the Poisson problem with Dirichlet border condition
@@ -40,6 +45,11 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
     mode_matrix<FLOAT_TYPE, int> d_volume_matrix; 
 #endif
 
+#ifdef USE_PRECONDITIONER
+    mode_matrix<FLOAT_TYPE, int> d_prec_matrix; 
+#endif
+
+
     void compute_rhs( FLOAT_TYPE (*f)(FLOAT_TYPE, FLOAT_TYPE),
                       FLOAT_TYPE (*u_ex)(FLOAT_TYPE, FLOAT_TYPE) );
 
@@ -54,6 +64,7 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
     FLOAT_TYPE max_err;
     FLOAT_TYPE L2_err;
     FLOAT_TYPE H1_err;
+    int iterations; 
 
     mode_vector<FLOAT_TYPE,int> d_u;
     mode_vector<FLOAT_TYPE,int> d_rhs;
@@ -65,10 +76,11 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
                   FLOAT_TYPE (*f)(FLOAT_TYPE, FLOAT_TYPE),
                   FLOAT_TYPE (*u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
                   FLOAT_TYPE (*dx_u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
-                  FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE) )
+                  FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE),
+                  FLOAT_TYPE _pen )
      : qt(_order+1),
        basis(_order),
-       pen(100*_order*_order)
+       pen(_pen)
     {
 
       const int noe = _mesh.dim()*_mesh.dim();
@@ -83,13 +95,22 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       d_volume_matrix = h_volume_matrix;
 #endif
 
+#ifdef USE_PRECONDITIONER
+      host_preconditioner_matrix<FLOAT_TYPE,int> h_prec_matrix(1, order, pen);
+      d_prec_matrix = h_prec_matrix;
+#endif
+
       host_mode_vector<FLOAT_TYPE,int> h_xx(noe, order+1);
       copy(h_xx, d_u);
 
       compute_rhs(f, u_ex);
 
 
-      int it = conjugate_gradient(*(this), d_u, d_rhs);
+#ifdef USE_PRECONDITIONER
+      iterations = preconditioned_conjugate_gradient(*(this), d_u, d_rhs);
+#else
+      iterations = conjugate_gradient(*(this), d_u, d_rhs);
+#endif
 
       // copy back the solution 
       copy(d_u, solution);
@@ -103,6 +124,9 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
 #ifdef USE_MODE_MATRIX
       d_volume_matrix.free();
 #endif
+#ifdef USE_PRECONDITIONER
+      d_prec_matrix.free();
+#endif
       d_rhs.free();
       d_u.free();
     }
@@ -111,7 +135,6 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
 
     void print_result();
            
-#ifdef USE_MODE_MATRIX
     int _mvm ( mode_vector<FLOAT_TYPE,int> input,
                mode_vector<FLOAT_TYPE,int> output ) const
     {
@@ -119,11 +142,15 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       const int noe = input.get_noe();
       const int blockD = 128;
 
-
+#ifdef USE_MODE_MATRIX
       volume_mvm <FLOAT_TYPE, 1>
       <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
       ( order, d_volume_matrix, input, output ); 
-
+#else
+      volume<FLOAT_TYPE>
+      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      ( order, input, output ); 
+#endif
 
       const int dimx = mesh.device_info.get_dimx();
       const int dimy = mesh.device_info.get_dimy();
@@ -133,12 +160,12 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       flux_term6a<FLOAT_TYPE>
       <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
           dim3( blockDx, blockDy, 1 ) >>>
-      ( order, mesh.device_info, input, output );
+      ( order, mesh.device_info, input, output, pen );
 
       flux_term6b<FLOAT_TYPE>
       <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
           dim3( blockDx, blockDy, 1 ) >>>
-      ( order, mesh.device_info, input, output );
+      ( order, mesh.device_info, input, output, pen );
 
 
     #if 0
@@ -153,19 +180,32 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
 
     }
 
-#else           
 
 
-    int _mvm ( mode_vector<FLOAT_TYPE,int> input,
-               mode_vector<FLOAT_TYPE,int> output ) const
+    int _prec_mvm ( mode_vector<FLOAT_TYPE,int> input,
+                    mode_vector<FLOAT_TYPE,int> output ) const
     {
-      return mvm ( order, mesh.device_info, input, output ); 
-    }
+#ifdef USE_PRECONDITIONER
+
+      const int noe = input.get_noe();
+      const int blockD = 128;
+
+      volume_mvm <FLOAT_TYPE, 1>
+      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      ( order, d_prec_matrix, input, output ); 
+
+    #if 0
+
+      cudaError_t error = cudaGetLastError();
+      std::string lastError = cudaGetErrorString(error); 
+      std::cout<<lastError<<std::endl;
+
+    #endif
 
 #endif
+      return 0;
+    }
 
-
-    
 
 
 };

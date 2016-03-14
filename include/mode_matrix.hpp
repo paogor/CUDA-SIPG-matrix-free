@@ -465,5 +465,61 @@ class host_laplacian_matrix : public  host_mode_matrix<FLOAT_TYPE, INT_TYPE>
 
 };
 
+// ===========================================================================
+
+#ifdef USE_PRECONDITIONER 
+/**
+  This class creates a host_mode_matrix containing the local precondition operators. 
+*/
+template<typename FLOAT_TYPE, typename INT_TYPE>
+class host_preconditioner_matrix : public  host_mode_matrix<FLOAT_TYPE, INT_TYPE>
+{
+  
+  public:
+/**
+  \param _noe number of elements
+  \param _order degree of basis functions 
+*/
+  host_preconditioner_matrix (INT_TYPE _noe, INT_TYPE _order, FLOAT_TYPE _pen)
+   : host_mode_matrix<FLOAT_TYPE, INT_TYPE>( _noe, _order)
+  {
+
+    block_diagonal_preconditioner_2d prec(_order, _pen);
+
+    for(int el = 0; el < _noe; el++)
+      for(int i1 = 0; i1 <= _order; ++i1)
+        for(int i2 = 0; i2 <= _order; ++i2)
+        {
+
+         // i1,i2
+         (*this)(i1,i2,0,el) = prec(i1,i2,i1,i2);
+
+
+         int r = 0;
+
+         // i1,[0..N]/i2
+         for( int j = 0; j <= _order; ++j )
+           if (j != i2)
+           {
+             r++;
+             (*this)(i1,i2,r,el) =  prec(i1,i2,i1,j);
+           }
+
+         // [0..N]/i1,i2
+         for( int j = 0; j <= _order; ++j )
+           if (j != i1)
+           {
+             r++;
+             (*this)(i1,i2,r,el) =  prec(i1,i2,j,i2);
+           }
+
+        }
+
+  }
+
+
+};
+#endif
+
 
 #endif

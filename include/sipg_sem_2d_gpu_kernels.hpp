@@ -188,9 +188,10 @@ int mvm ( int order,
 
 template<typename T>
 __global__ void flux_term6a ( int N,
-                                   quadrilateral_mesh_info<T>m,
-                                   mode_vector<T,int> input,
-                                   mode_vector<T,int> output)
+                              quadrilateral_mesh_info<T>m,
+                              mode_vector<T,int> input,
+                              mode_vector<T,int> output,
+                              T pen = 100 )
 {
 
   int xx = blockDim.x*blockIdx.x + threadIdx.x; 
@@ -206,7 +207,7 @@ __global__ void flux_term6a ( int N,
   const int idxLEFT =  m.get_neighborhood_LEFT(xx, yy);
 
 
-  const T nu = 100*N*N; // check
+  const T nu = pen;//100*N*N; // check
   #pragma unroll 1     
   for (int j=0; j <= N; ++j)
   {
@@ -254,9 +255,10 @@ __global__ void flux_term6a ( int N,
 
 template<typename T>
 __global__ void flux_term6b( int N,
-                                   quadrilateral_mesh_info<T>m,
-                                   mode_vector<T,int> input,
-                                   mode_vector<T,int> output)
+                             quadrilateral_mesh_info<T>m,
+                             mode_vector<T,int> input,
+                             mode_vector<T,int> output,
+                             T pen = 100 )
 {
 
   int xx = blockDim.x*blockIdx.x + threadIdx.x; 
@@ -272,7 +274,7 @@ __global__ void flux_term6b( int N,
   const int idxUP = m.get_neighborhood_UP(xx, yy); 
 
 
-  const T nu = 100*N*N; // check
+  const T nu = pen;// 100*N*N; // check
   #pragma unroll 1     
   for (int j=0; j <= N; ++j)
   {
@@ -322,6 +324,8 @@ int mvm ( int order,
           mode_vector<FLOAT_TYPE,int> output ) 
 {
 
+  const FLOAT_TYPE pen = 100*order*order;
+
   const int noe = input.get_noe();
   const int blockD = 128;
 
@@ -339,12 +343,12 @@ int mvm ( int order,
   flux_term6a<FLOAT_TYPE>
   <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
       dim3( blockDx, blockDy, 1 ) >>>
-  ( order, mesh, input, output );
+  ( order, mesh, input, output, pen );
 
   flux_term6b<FLOAT_TYPE>
   <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
       dim3( blockDx, blockDy, 1 ) >>>
-  ( order, mesh, input, output );
+  ( order, mesh, input, output, pen );
 
 
 

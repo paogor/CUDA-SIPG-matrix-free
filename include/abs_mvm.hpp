@@ -13,6 +13,9 @@ class abs_mvm
   public:
     virtual int _mvm ( mode_vector<FLOAT_TYPE,int>,
                        mode_vector<FLOAT_TYPE,int> ) const = 0;
+
+    virtual int _prec_mvm ( mode_vector<FLOAT_TYPE,int>,
+                            mode_vector<FLOAT_TYPE,int> ) const = 0;
 };
 
 
