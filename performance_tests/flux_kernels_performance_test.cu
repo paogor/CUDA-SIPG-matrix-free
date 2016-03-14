@@ -5,6 +5,11 @@
 
 #include<build_square_mesh.hpp>
 
+#if 1
+  #define TEST_P
+#else
+  #define TEST_H
+#endif
 
 
 template<typename T>
@@ -35,11 +40,6 @@ int test( int order, int dim )
 
 
 
-#define TEST_P
-//#define TEST_H
-
-
-
 int main()
 {
 
@@ -47,7 +47,7 @@ int main()
 #ifdef TEST_P
   std::cerr<<"TEST_P: 2 4 8 16 32"<<std::endl;
 
-  for(int i =2 ; i < 33; i *=2 ) 
+  for(int i =2 ; i < 9; i *=2 ) 
     test<double>( i, 512);
 #endif
 
@@ -56,7 +56,7 @@ int main()
   std::cerr<<"TEST_H: 128 256 512 1042 2048"<<std::endl;
 
   for(int i =128 ; i < 2049; i *=2 ) 
-    test<float>( 4, i);
+    test<double>( 4, i);
 #endif
 
 
