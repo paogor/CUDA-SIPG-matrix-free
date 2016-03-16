@@ -11,6 +11,15 @@ list( APPEND CUDA_NVCC_FLAGS -arch=${COMPUTE_CAPABILITY} )
 
 set( GCL_USAGE "OFF" CACHE BOOL "Set ON in order to employ GCL library" )
 set( GCL_SOURCE_DIR "../gcl/trunk" CACHE STRING "Set the GCL source directory" )
+set( DAINT_LAPACKE "OFF" CACHE BOOL "Set ON in order to employ LAPACKE library on DAINT")
+
+
+if( "${DAINT_LAPACKE}" STREQUAL "ON" )
+ include_directories("/users/paogor/lapack/lapack-3.6.0/LAPACKE/include")
+ link_directories("/users/paogor/lapack/lapack-3.6.0/build/lib")
+endif()
+
+
 
 include_directories("include/")
 
