@@ -9,13 +9,13 @@
 */
 
 #define USE_PRECONDITIONER 
+#define USE_MODE_MATRIX
+//#define ONE_ITERATION_TEST
 
-#include<iostream>
-
-#define EXACT_SOLUTION_NO 1
+#define EXACT_SOLUTION_NO 5
 #include"../analytical_solutions.hpp"
 
-#define USE_MODE_MATRIX
+#include<iostream>
 #include<sipg_sem_2d.hpp>
 
 #include<iomanip>
@@ -36,14 +36,15 @@ int main()
 
 
 
-  int degree = 8;
+  int degree = 4;
 
 //  for (int degree = 2; degree < 9; ++degree)
   {
   double L2_err_old(0), H1_err_old(0);
   
 
-  for (int dim = 4; dim < 129; dim*=2)
+  int dim = 512;
+//  for (int dim = 4; dim < 513; dim*=2)
   {
 
     CUDA_TIMER t;
@@ -59,8 +60,8 @@ int main()
     std::cout<<std::setw(12)<<log(p.L2_err/L2_err_old)/log(2)<<"\t";
     std::cout<<std::setw(12)<<p.L2_err<<"\t";
     std::cout<<std::setw(12)<<p.max_err;
-//    std::cout<<"\t"<<it;
-    std::cout<<"\t"<<t.elapsed_millisecs();
+    std::cout<<"\t"<<std::setw(10)<<t.elapsed_millisecs();
+    std::cout<<"\t"<<std::setw(10)<<p.solution_time();
     std::cout<<"\t"<<p.iterations;
     std::cout<<std::endl;
 

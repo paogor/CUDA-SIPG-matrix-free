@@ -19,6 +19,7 @@
   #include<mode_matrix_kernels.hpp>
 #endif
 
+#include<CUDA_TIMER.hpp>
 
 /**
   This class solves the Poisson problem with Dirichlet border condition
@@ -49,6 +50,8 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
     mode_matrix<FLOAT_TYPE, int> d_prec_matrix; 
 #endif
 
+    
+    CUDA_TIMER system_solution_time;
 
     void compute_rhs( FLOAT_TYPE (*f)(FLOAT_TYPE, FLOAT_TYPE),
                       FLOAT_TYPE (*u_ex)(FLOAT_TYPE, FLOAT_TYPE) );
@@ -106,11 +109,13 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       compute_rhs(f, u_ex);
 
 
+      system_solution_time.start();
 #ifdef USE_PRECONDITIONER
       iterations = preconditioned_conjugate_gradient(*(this), d_u, d_rhs);
 #else
       iterations = conjugate_gradient(*(this), d_u, d_rhs);
 #endif
+      system_solution_time.stop();
 
       // copy back the solution 
       copy(d_u, solution);
@@ -131,6 +136,10 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       d_u.free();
     }
 
+    float solution_time()
+    {
+      return system_solution_time.elapsed_millisecs();
+    }
 
 
     void print_result();
