@@ -3,6 +3,13 @@
 
 #include<abs_mvm.hpp>
 #include<cublas_wrapper.hpp>
+#include<conjugate_gradient_kernels.hpp>
+
+#ifdef ONE_ITERATION_TEST
+  #include<CUDA_TIMER.hpp>
+#endif
+
+
 
 /**
   This is the Conjugate Gradient function solver.   
@@ -11,7 +18,7 @@ template<typename FLOAT_TYPE>
 int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                          mode_vector<FLOAT_TYPE,int> x,
                          mode_vector<FLOAT_TYPE,int> b,
-                         FLOAT_TYPE tol=1e-15)
+                         FLOAT_TYPE tol=1e-13)
 {
 
   const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
@@ -55,43 +62,53 @@ int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
 
 //  std::cerr<<"rr_old "<<rr_old<<std::endl;
 
-  const FLOAT_TYPE stop = norm_b*tol;
+  const FLOAT_TYPE stop = /*norm_b*/tol;
+     
+  const int blockD = 128;
+  const int gridSIZE = (b.size() + blockD - 1)/blockD;
+
+#ifdef ONE_ITERATION_TEST
+  const int max_it = 1; 
+#else
   const int max_it = 10e8; // max iterations
+#endif
+
   int it = 0; // iteration count
 
 
   while ( sqrt(rr_old)>stop && it < max_it )
   {
 
-    /* compute Ap */
+#ifdef ONE_ITERATION_TEST
+   CUDA_TIMER t;
+   t.start();
+#endif
 
     // Ap = A*p
     problem._mvm(p, Ap);
-    //
 
     cublas_dot(handle, p.size(), p.data(), 1, Ap.data(), 1, &pAp);
 
     FLOAT_TYPE alpha = rr_old/pAp;
-    FLOAT_TYPE minus_alpha = -1.*alpha;
 
     // x(k+1) = x(k) + alpha*p(k)  
-    cublas_axpy(handle, p.size(), &alpha, p.data(), 1, x.data(), 1);
+    // r(k+1) = r(k) - alpha*Ap(k)   
+    alpha_kernel<<<gridSIZE, blockD>>>( x.size(), x.data(), p.data(), r.data(), Ap.data(), alpha );
 
-
-    // r 
-    cublas_axpy(handle, Ap.size(), &minus_alpha, Ap.data(), 1, r.data(), 1);
     cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_new);
 
     FLOAT_TYPE beta = rr_new/rr_old;
 
     // p(k+1) = r(k+1) + beta*p(k)     
-    cublas_scal(handle, p.size(), &beta, p.data(), 1);
-    cublas_axpy(handle, r.size(), &one, r.data(), 1, p.data(), 1);
-
-//    std::cerr<<it<<": rr_old "<<rr_old<<std::endl;
+    beta_kernel<<<gridSIZE, blockD>>>( p.size(), p.data(), r.data(), beta );
 
     rr_old = rr_new;
     ++it;
+
+#ifdef ONE_ITERATION_TEST
+   t.stop();
+   std::cout<<std::endl<<t.elapsed_millisecs()<<std::endl;
+#endif
 
   }   
 
@@ -114,7 +131,7 @@ template<typename FLOAT_TYPE>
 int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                                         mode_vector<FLOAT_TYPE,int> x,
                                         mode_vector<FLOAT_TYPE,int> b,
-                                        FLOAT_TYPE tol=1e-15)
+                                        FLOAT_TYPE tol=1e-13)
 {
 
   const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
@@ -157,12 +174,17 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   /* compute r*z */
   cublas_dot(handle, r.size(), r.data(), 1, z.data(), 1, &rr_old);
 
-  const FLOAT_TYPE stop = norm_b*tol;
-  const int max_it = 10e8; // max iterations
+  const int blockD = 128;
+  const int gridSIZE = (b.size() + blockD - 1)/blockD;
+
+
+  const FLOAT_TYPE stop = /*norm_b*/tol;
+  const int max_it = 3; // max iterations
   int it = 0; // iteration count
 
+  FLOAT_TYPE rr = 1;
 
-  while ( sqrt(fabs(rr_old))>stop && it < max_it )
+  while ( sqrt(rr)>stop && it < max_it )
   {
 
     /* compute Ap */
@@ -174,13 +196,12 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
     cublas_dot(handle, p.size(), p.data(), 1, Ap.data(), 1, &pAp);
 
     FLOAT_TYPE alpha = rr_old/pAp;
-    FLOAT_TYPE minus_alpha = -1.*alpha;
 
     // x(k+1) = x(k) + alpha*p(k)  
-    cublas_axpy(handle, p.size(), &alpha, p.data(), 1, x.data(), 1);
+    // r(k+1) = r(k) - alpha*Ap(k)   
+    alpha_kernel<<<gridSIZE, blockD>>>( x.size(), x.data(), p.data(), r.data(), Ap.data(), alpha );
 
-    // r 
-    cublas_axpy(handle, Ap.size(), &minus_alpha, Ap.data(), 1, r.data(), 1);
+    cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr);
 
     problem._prec_mvm(r, z);
 
@@ -188,10 +209,8 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
 
     FLOAT_TYPE beta = rr_new/rr_old;
 
-    // p(k+1) = r(k+1) + beta*p(k)     
-    cublas_scal(handle, p.size(), &beta, p.data(), 1);
-    cublas_axpy(handle, z.size(), &one, z.data(), 1, p.data(), 1);
-
+    // p(k+1) = z(k+1) + beta*p(k)     
+    beta_kernel<<<gridSIZE, blockD>>>( p.size(), p.data(), z.data(), beta );
 
     rr_old = rr_new;
     ++it;
