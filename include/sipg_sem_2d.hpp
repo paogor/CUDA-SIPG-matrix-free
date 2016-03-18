@@ -62,6 +62,12 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
                     FLOAT_TYPE (*dx_u_ex)(FLOAT_TYPE, FLOAT_TYPE),
                     FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE) );
 
+    dim3 volume_gridSIZE;
+    dim3 volume_blockSIZE;
+
+    dim3 flux_gridSIZE;
+    dim3 flux_blockSIZE;
+
   public:
 
     FLOAT_TYPE max_err;
@@ -80,7 +86,8 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
                   FLOAT_TYPE (*u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
                   FLOAT_TYPE (*dx_u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
                   FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE),
-                  FLOAT_TYPE _pen )
+                  FLOAT_TYPE _pen,
+                  FLOAT_TYPE _tol )
      : qt(_order+1),
        basis(_order),
        pen(_pen)
@@ -92,6 +99,19 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
       // initialize
       load_Dphi_table<FLOAT_TYPE>(order);
       load_lgl_quadrature_table<FLOAT_TYPE>(order);
+
+      const int blockD = 128;
+      volume_gridSIZE = dim3( (noe + blockD - 1)/blockD , order+1, order+1);
+      volume_blockSIZE = dim3(blockD, 1, 1); 
+
+      const int dimx = mesh.device_info.get_dimx();
+      const int dimy = mesh.device_info.get_dimy();
+      const int blockDx = 32;
+      const int blockDy = 4;
+
+      flux_gridSIZE = dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 );
+      flux_blockSIZE = dim3( blockDx, blockDy, 1 );
+
 
 #ifdef USE_MODE_MATRIX
       host_laplacian_matrix<FLOAT_TYPE,int> h_volume_matrix(1, order);
@@ -111,9 +131,9 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
 
       system_solution_time.start();
 #ifdef USE_PRECONDITIONER
-      iterations = preconditioned_conjugate_gradient(*(this), d_u, d_rhs);
+      iterations = preconditioned_conjugate_gradient(*(this), d_u, d_rhs, _tol);
 #else
-      iterations = conjugate_gradient(*(this), d_u, d_rhs);
+      iterations = conjugate_gradient(*(this), d_u, d_rhs, _tol);
 #endif
       system_solution_time.stop();
 
@@ -148,32 +168,23 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
                mode_vector<FLOAT_TYPE,int> output ) const
     {
 
-      const int noe = input.get_noe();
-      const int blockD = 128;
 
 #ifdef USE_MODE_MATRIX
       volume_mvm <FLOAT_TYPE, 1>
-      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
       ( order, d_volume_matrix, input, output ); 
 #else
       volume<FLOAT_TYPE>
-      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
       ( order, input, output ); 
 #endif
 
-      const int dimx = mesh.device_info.get_dimx();
-      const int dimy = mesh.device_info.get_dimy();
-      const int blockDx = 32;
-      const int blockDy = 4;
-
       flux_term6a<FLOAT_TYPE>
-      <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
-          dim3( blockDx, blockDy, 1 ) >>>
+      <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output, pen );
 
       flux_term6b<FLOAT_TYPE>
-      <<< dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 ) ,
-          dim3( blockDx, blockDy, 1 ) >>>
+      <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output, pen );
 
 
@@ -196,11 +207,8 @@ class sipg_sem_2d : public abs_mvm<FLOAT_TYPE>
     {
 #ifdef USE_PRECONDITIONER
 
-      const int noe = input.get_noe();
-      const int blockD = 128;
-
       volume_mvm <FLOAT_TYPE, 1>
-      <<<dim3( (noe + blockD - 1)/blockD , order+1, order+1), blockD>>>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
       ( order, d_prec_matrix, input, output ); 
 
     #if 0

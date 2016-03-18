@@ -18,71 +18,54 @@ template<typename FLOAT_TYPE>
 int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                          mode_vector<FLOAT_TYPE,int> x,
                          mode_vector<FLOAT_TYPE,int> b,
-                         FLOAT_TYPE tol=1e-13)
+                         FLOAT_TYPE tol=1e-3)
 {
-
-  const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
 
   const int noe = x.get_noe();
   const int nompe = x.get_nompe();
 
-
   /* allocating space on device */
   mode_vector<FLOAT_TYPE, int> r(noe, nompe), p(noe, nompe), Ap(noe, nompe);
 
+  const int blockD = 128;
+  const int gridSIZE = (b.size() + blockD - 1)/blockD;
+
   cublasHandle_t handle;
   cublasCreate(&handle); 
+
+
+
+
+  FLOAT_TYPE rr_old = .0, rr_new = .0 ;
+  FLOAT_TYPE pAp = .0;
 
   // compute the L2-norm of b (to stop iterations)
   FLOAT_TYPE norm_b;
   cublas_dot(handle, b.size(), b.data(), 1, b.data(), 1, &norm_b);
   norm_b = sqrt(norm_b);
 
-  // inizialize r: r=b-Ax 
-
-  // r = -Ax
+  // r = b - Ax
   problem._mvm(x, r);
-
-  cublas_scal(handle, r.size(), &minus_one, r.data(), 1);
-  //
-
-  // r = b + r
-  cublas_axpy(handle, b.size(), &one, b.data(), 1, r.data(), 1);
-
+  beta_kernel<<<gridSIZE, blockD>>>( b.size(), r.data(), b.data(), FLOAT_TYPE(-1) );
 
   /* p = r */
   cudaMemcpy (p.data(), r.data(), r.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice);
 
-
-  FLOAT_TYPE rr_old = .0, rr_new = .0 ;
-  FLOAT_TYPE pAp = .0;
-
   /* compute r*r */
   cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_old);
 
-//  std::cerr<<"rr_old "<<rr_old<<std::endl;
+
+
+
 
   const FLOAT_TYPE stop = /*norm_b*/tol;
      
-  const int blockD = 128;
-  const int gridSIZE = (b.size() + blockD - 1)/blockD;
-
-#ifdef ONE_ITERATION_TEST
-  const int max_it = 1; 
-#else
   const int max_it = 10e8; // max iterations
-#endif
-
   int it = 0; // iteration count
 
 
   while ( sqrt(rr_old)>stop && it < max_it )
   {
-
-#ifdef ONE_ITERATION_TEST
-   CUDA_TIMER t;
-   t.start();
-#endif
 
     // Ap = A*p
     problem._mvm(p, Ap);
@@ -105,11 +88,6 @@ int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
     rr_old = rr_new;
     ++it;
 
-#ifdef ONE_ITERATION_TEST
-   t.stop();
-   std::cout<<std::endl<<t.elapsed_millisecs()<<std::endl;
-#endif
-
   }   
 
   /* free space */
@@ -131,7 +109,7 @@ template<typename FLOAT_TYPE>
 int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                                         mode_vector<FLOAT_TYPE,int> x,
                                         mode_vector<FLOAT_TYPE,int> b,
-                                        FLOAT_TYPE tol=1e-13)
+                                        FLOAT_TYPE tol=1e-3)
 {
 
   const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
@@ -143,55 +121,45 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   /* allocating space on device */
   mode_vector<FLOAT_TYPE, int> r(noe, nompe), p(noe, nompe), Ap(noe, nompe), z(noe, nompe);
 
+  const int blockD = 128;
+  const int gridSIZE = (b.size() + blockD - 1)/blockD;
+
   cublasHandle_t handle;
   cublasCreate(&handle); 
+
+
+
+  FLOAT_TYPE rr_old = .0, rr_new = .0 ;
+  FLOAT_TYPE pAp = .0;
+
 
   // compute the L2-norm of b (to stop iterations)
   FLOAT_TYPE norm_b;
   cublas_dot(handle, b.size(), b.data(), 1, b.data(), 1, &norm_b);
   norm_b = sqrt(norm_b);
 
-  // inizialize r: r=b-Ax 
-
-  // r = -Ax
+  // r = b - Ax
   problem._mvm(x, r);
-
-  cublas_scal(handle, r.size(), &minus_one, r.data(), 1);
-  //
-
-  // r = b + r
-  cublas_axpy(handle, b.size(), &one, b.data(), 1, r.data(), 1);
-
+  beta_kernel<<<gridSIZE, blockD>>>( b.size(), r.data(), b.data(), FLOAT_TYPE(-1) );
 
   problem._prec_mvm(r, z);
-  /* p = z */
+  // p = z 
   cudaMemcpy (p.data(), z.data(), z.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice);
 
-
-  FLOAT_TYPE rr_old = .0, rr_new = .0 ;
-  FLOAT_TYPE pAp = .0;
-
-  /* compute r*z */
+  // compute r*z 
   cublas_dot(handle, r.size(), r.data(), 1, z.data(), 1, &rr_old);
-
-  const int blockD = 128;
-  const int gridSIZE = (b.size() + blockD - 1)/blockD;
 
 
   const FLOAT_TYPE stop = /*norm_b*/tol;
-  const int max_it = 3; // max iterations
+  const int max_it = 10e8; // max iterations
   int it = 0; // iteration count
-
-  FLOAT_TYPE rr = 1;
+  FLOAT_TYPE rr(1);
 
   while ( sqrt(rr)>stop && it < max_it )
   {
 
-    /* compute Ap */
-
     // Ap = A*p
     problem._mvm(p, Ap);
-    //
 
     cublas_dot(handle, p.size(), p.data(), 1, Ap.data(), 1, &pAp);
 

@@ -34,24 +34,25 @@ int main()
   std::cout<<"USE_PRECONDITIONER is ON"<<std::endl;
 #endif
 
-
+  const double toll = 10e-8;
 
   int degree = 4;
 
-//  for (int degree = 2; degree < 9; ++degree)
+  for (int degree = 2; degree < 9; ++degree)
   {
-  double L2_err_old(0), H1_err_old(0);
-  
+    const double penalty = 100*degree*degree;
+    double L2_err_old(0), H1_err_old(0);  
 
-  int dim = 512;
-//  for (int dim = 4; dim < 513; dim*=2)
+//  int dim = 512;
+  for (int dim = 4; dim < 513; dim*=2)
   {
+
 
     CUDA_TIMER t;
     using namespace test_func;
     t.start();
     square_mesh<double> sq_mesh(dim);
-    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex, 100*degree*degree);
+    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex, penalty, toll);
     t.stop();
 
     std::cout<<dim<<"\t"<<degree<<"\t";
@@ -60,7 +61,7 @@ int main()
     std::cout<<std::setw(12)<<log(p.L2_err/L2_err_old)/log(2)<<"\t";
     std::cout<<std::setw(12)<<p.L2_err<<"\t";
     std::cout<<std::setw(12)<<p.max_err;
-    std::cout<<"\t"<<std::setw(10)<<t.elapsed_millisecs();
+//    std::cout<<"\t"<<std::setw(10)<<t.elapsed_millisecs();
     std::cout<<"\t"<<std::setw(10)<<p.solution_time();
     std::cout<<"\t"<<p.iterations;
     std::cout<<std::endl;
