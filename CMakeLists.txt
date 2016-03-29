@@ -4,7 +4,7 @@ project(CUDA-Matrix-Free-SIPG)
 
 find_package(CUDA REQUIRED)
 
-add_executable(plot_basis validation_tests/sem_basis/plot_basis.cpp)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 set( COMPUTE_CAPABILITY "sm_21" CACHE STRING "Set the device compute capability: sm_20, sm_35 ..." )
 list( APPEND CUDA_NVCC_FLAGS -arch=${COMPUTE_CAPABILITY} )

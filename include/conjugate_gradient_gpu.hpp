@@ -9,6 +9,7 @@
   #include<CUDA_TIMER.hpp>
 #endif
 
+#define BLOCK_DIM 128 
 
 
 /**
@@ -18,7 +19,7 @@ template<typename FLOAT_TYPE>
 int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                          mode_vector<FLOAT_TYPE,int> x,
                          mode_vector<FLOAT_TYPE,int> b,
-                         FLOAT_TYPE tol=1e-3)
+                         FLOAT_TYPE tol)
 {
 
   const int noe = x.get_noe();
@@ -27,14 +28,11 @@ int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   /* allocating space on device */
   mode_vector<FLOAT_TYPE, int> r(noe, nompe), p(noe, nompe), Ap(noe, nompe);
 
-  const int blockD = 128;
+  const int blockD = BLOCK_DIM;
   const int gridSIZE = (b.size() + blockD - 1)/blockD;
 
   cublasHandle_t handle;
   cublasCreate(&handle); 
-
-
-
 
   FLOAT_TYPE rr_old = .0, rr_new = .0 ;
   FLOAT_TYPE pAp = .0;
@@ -48,19 +46,23 @@ int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   problem._mvm(x, r);
   beta_kernel<<<gridSIZE, blockD>>>( b.size(), r.data(), b.data(), FLOAT_TYPE(-1) );
 
+  cudaError_t error = cudaGetLastError();
+  if (error != 0)
+  {
+    std::string lastError = cudaGetErrorString(error); 
+    std::cout<<"conjugate gradient KERNEL error: "<<lastError<<std::endl;
+  }
+
   /* p = r */
-  cudaMemcpy (p.data(), r.data(), r.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice);
+ checkError( cudaMemcpy (p.data(), r.data(), r.size()*sizeof(FLOAT_TYPE), cudaMemcpyDeviceToDevice) );
 
   /* compute r*r */
   cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_old);
 
 
-
-
-
   const FLOAT_TYPE stop = /*norm_b*/tol;
      
-  const int max_it = 10e8; // max iterations
+  const int max_it = b.size(); // max iterations
   int it = 0; // iteration count
 
 
@@ -72,21 +74,27 @@ int conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
 
     cublas_dot(handle, p.size(), p.data(), 1, Ap.data(), 1, &pAp);
 
+//    std::cerr<<it<<": pAp "<<pAp<<std::endl;
     FLOAT_TYPE alpha = rr_old/pAp;
 
+//    std::cerr<<it<<": alpha "<<alpha<<std::endl;
     // x(k+1) = x(k) + alpha*p(k)  
     // r(k+1) = r(k) - alpha*Ap(k)   
     alpha_kernel<<<gridSIZE, blockD>>>( x.size(), x.data(), p.data(), r.data(), Ap.data(), alpha );
 
     cublas_dot(handle, r.size(), r.data(), 1, r.data(), 1, &rr_new);
 
+//    std::cerr<<it<<": rr_new "<<rr_new<<std::endl;
     FLOAT_TYPE beta = rr_new/rr_old;
 
+//    std::cerr<<it<<": beta "<<beta<<std::endl;
     // p(k+1) = r(k+1) + beta*p(k)     
     beta_kernel<<<gridSIZE, blockD>>>( p.size(), p.data(), r.data(), beta );
 
     rr_old = rr_new;
     ++it;
+
+//    std::cerr<<it<<": "<<rr_old<<std::endl;
 
   }   
 
@@ -109,7 +117,7 @@ template<typename FLOAT_TYPE>
 int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem, 
                                         mode_vector<FLOAT_TYPE,int> x,
                                         mode_vector<FLOAT_TYPE,int> b,
-                                        FLOAT_TYPE tol=1e-3)
+                                        FLOAT_TYPE tol)
 {
 
   const FLOAT_TYPE one(1), minus_one(-1); //, zero(0);
@@ -121,7 +129,7 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   /* allocating space on device */
   mode_vector<FLOAT_TYPE, int> r(noe, nompe), p(noe, nompe), Ap(noe, nompe), z(noe, nompe);
 
-  const int blockD = 128;
+  const int blockD = BLOCK_DIM;
   const int gridSIZE = (b.size() + blockD - 1)/blockD;
 
   cublasHandle_t handle;
@@ -141,6 +149,14 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   // r = b - Ax
   problem._mvm(x, r);
   beta_kernel<<<gridSIZE, blockD>>>( b.size(), r.data(), b.data(), FLOAT_TYPE(-1) );
+  
+  cudaError_t error = cudaGetLastError();
+  if (error != 0)
+  {
+    std::string lastError = cudaGetErrorString(error); 
+    std::cout<<"preconditioned conjugate gradient KERNEL error: "<<lastError<<std::endl;
+  }
+
 
   problem._prec_mvm(r, z);
   // p = z 
@@ -149,9 +165,8 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
   // compute r*z 
   cublas_dot(handle, r.size(), r.data(), 1, z.data(), 1, &rr_old);
 
-
   const FLOAT_TYPE stop = /*norm_b*/tol;
-  const int max_it = 10e8; // max iterations
+  const int max_it = b.size(); // max iterations
   int it = 0; // iteration count
   FLOAT_TYPE rr(1);
 
@@ -183,6 +198,7 @@ int preconditioned_conjugate_gradient ( const abs_mvm<FLOAT_TYPE> & problem,
     rr_old = rr_new;
     ++it;
 
+//    std::cerr<<it<<": "<<beta<<std::endl;
   }   
 
   /* free space */

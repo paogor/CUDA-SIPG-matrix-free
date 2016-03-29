@@ -20,10 +20,10 @@ __global__ void local_flux_term6a ( int N,
   int xx = blockDim.x*blockIdx.x + threadIdx.x; 
   int yy = blockDim.y*blockIdx.y + threadIdx.y; 
 
-  int idx = m.compute_idx(xx, yy); 
 
   if ( (xx >= m.get_dimx()) ||  (yy >= m.get_dimy()) ) return;
 
+  int idx = m.compute_idx(xx, yy); 
   T * c_lgl = device_const::lgl_weights<T>(); 
 
   const int idxRIGHT = m.get_neighborhood_RIGHT(xx, yy);
@@ -86,10 +86,10 @@ __global__ void local_flux_term6b( int N,
   int xx = blockDim.x*blockIdx.x + threadIdx.x; 
   int yy = blockDim.y*blockIdx.y + threadIdx.y; 
 
-  int idx = m.compute_idx(xx, yy); 
 
   if ( (xx >= m.get_dimx()) ||  (yy >= m.get_dimy()) ) return;
 
+  int idx = m.compute_idx(xx, yy); 
   T * c_lgl = device_const::lgl_weights<T>(); 
 
   const int idxDOWN = m.get_neighborhood_DOWN(xx, yy);

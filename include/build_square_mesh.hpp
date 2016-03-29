@@ -170,19 +170,23 @@ class square_mesh
       const int x = element % _dim;
       const int y = element / _dim;
 
+      int retval;
+
       switch(n)
       { 
         case 0:
-          return device_info.get_neighborhood_DOWN(x, y); 
+          retval = device_info.get_neighborhood_DOWN(x, y); 
         case 1:
-          return device_info.get_neighborhood_RIGHT(x, y);
+          retval = device_info.get_neighborhood_RIGHT(x, y);
         case 2:
-          return device_info.get_neighborhood_UP(x, y); 
+          retval = device_info.get_neighborhood_UP(x, y); 
         case 3: 
-          return device_info.get_neighborhood_LEFT(x, y);
+          retval = device_info.get_neighborhood_LEFT(x, y);
         default:
           assert(true);
       }
+
+      return retval;
 
 #else 
       // DOWN   n = 0
@@ -444,19 +448,23 @@ class square_mesh_multigpu
       const int x = element % _local_dim;
       const int y = element / _local_dim;
 
+      int retval;
+   
       switch(n)
       { 
         case 0:
-          return device_info.get_neighborhood_DOWN(x, y); 
+         retval = device_info.get_neighborhood_DOWN(x, y); 
         case 1:
-          return device_info.get_neighborhood_RIGHT(x, y);
+         retval = device_info.get_neighborhood_RIGHT(x, y);
         case 2:
-          return device_info.get_neighborhood_UP(x, y); 
+         retval = device_info.get_neighborhood_UP(x, y); 
         case 3: 
-          return device_info.get_neighborhood_LEFT(x, y);
+         retval =  device_info.get_neighborhood_LEFT(x, y);
         default:
           assert(true);
       }
+
+      return retval;
 
    }
 

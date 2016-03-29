@@ -16,9 +16,12 @@ class abs_mvm_multigpu
     virtual int _mvm ( mode_vector<FLOAT_TYPE,int> input ) = 0;
     /** This method returns the result 
         of the last matrix vector product */
-    virtual mode_vector<FLOAT_TYPE,int> _mvm_output() = 0;
+    virtual mode_vector<FLOAT_TYPE,int>& _mvm_output() = 0;
 
     virtual FLOAT_TYPE _dot_product ( mode_vector<FLOAT_TYPE,int>, mode_vector<FLOAT_TYPE,int> ) = 0;
+
+    virtual int _prec_mvm ( mode_vector<FLOAT_TYPE,int>,
+                            mode_vector<FLOAT_TYPE,int> ) const = 0;
 
 };
 
