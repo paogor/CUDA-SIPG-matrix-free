@@ -1,13 +1,22 @@
 #ifndef __DOTPRODUCT_MULTIGPU_HPP__
 #define __DOTPRODUCT_MULTIGPU_HPP__
 
+
+
+//#define USE_THRUST
+
+#ifdef USE_THRUST
+  #include<thrust/reduce.h> 
+  #include<thrust/device_ptr.h>
+#endif
+
 #include<mode_vector.hpp>
 #include<mesh_info.hpp>
 #include<CUDA_ERRORS.hpp>
-#include<thrust/reduce.h> 
-#include<thrust/device_ptr.h>
 
-#include<mpi.h>
+#ifndef __DEBUG_NO_MPI__
+  #include<mpi.h>
+#endif
 
 #include<iostream>
 
@@ -21,25 +30,28 @@ __global__ void dotprod_kernel ( int order,
 {
 
   int tid = blockDim.x*threadIdx.y + threadIdx.x;
-  extern __shared__ FLOAT_TYPE sdata[];
+  __shared__ FLOAT_TYPE sdata[blockSize];
   sdata[tid] = 0;
 
   int xx = blockDim.x*blockIdx.x + threadIdx.x; 
   int yy = blockDim.y*blockIdx.y + threadIdx.y; 
  
-  int idx = m.compute_idx(xx, yy); 
 
-  if ( (xx >= m.get_dimx()) ||  (yy >= m.get_dimy()) ) return;
+  if ( (xx < m.get_dimx()) && (yy < m.get_dimy()) )
+  { 
 
-  FLOAT_TYPE r(0);
-  for(int i1 = 0; i1 < order+1; ++i1) 
-    for(int i2 = 0; i2 < order+1; ++i2) 
-      r += a(i1, i2, idx)*b(i1, i2, idx);
+    int idx = m.compute_idx(xx, yy); 
+
+    FLOAT_TYPE r(0);
+    for(int i1 = 0; i1 < order+1; ++i1) 
+      for(int i2 = 0; i2 < order+1; ++i2) 
+        r += a(i1, i2, idx)*b(i1, i2, idx);
+
+    sdata[tid] = r;
+
+  }
 
   // the next block of code came from mark harris TODO: write this credit better
-
-  sdata[tid] = r;
-
   __syncthreads();
 
   if (blockSize >= 1024) { if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads(); }
@@ -87,7 +99,12 @@ class dotproduct_multigpu
     dim3 gridSIZE;
     dim3 blockSIZE;
 
-    thrust::device_ptr<FLOAT_TYPE> d_thrust_pointer;
+#ifdef USE_THRUST
+    thrust::device_ptr<FLOAT_TYPE> d_thrust_begin;
+    thrust::device_ptr<FLOAT_TYPE> d_thrust_end;
+#else
+    std::vector<FLOAT_TYPE> host_odata;
+#endif
 
   public:
 
@@ -98,7 +115,7 @@ class dotproduct_multigpu
       const int dimx = local_mesh_info.get_dimx();
       const int dimy = local_mesh_info.get_dimy();
       const int blockDx = 32;
-      const int blockDy = 4;
+      const int blockDy = 32;
 
       gridSIZE = dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 );
       blockSIZE = dim3( blockDx, blockDy, 1 );
@@ -106,8 +123,14 @@ class dotproduct_multigpu
       // allocate odata
       checkError( cudaMalloc(&odata, gridSIZE.x*gridSIZE.y*sizeof(FLOAT_TYPE)) );
 
-      thrust::device_ptr<double> tmp(odata);
-      d_thrust_pointer = tmp;
+
+#ifdef USE_THRUST
+      thrust::device_ptr<FLOAT_TYPE> tmp(odata);
+      d_thrust_begin = tmp;
+      d_thrust_end = tmp + (gridSIZE.x*gridSIZE.y);
+#else
+      host_odata.resize(gridSIZE.x*gridSIZE.y);
+#endif
 
     }
 
@@ -117,61 +140,48 @@ class dotproduct_multigpu
       checkError( cudaFree(odata) );
     }
 
-    FLOAT_TYPE operator() ( mode_vector<FLOAT_TYPE, int> a,
-                            mode_vector<FLOAT_TYPE, int> b )
+    double operator() ( mode_vector<FLOAT_TYPE, int> a,
+                        mode_vector<FLOAT_TYPE, int> b )
     {
 
       // first step kernel
-      dotprod_kernel<FLOAT_TYPE, 128>
-      <<< gridSIZE, blockSIZE, sizeof(FLOAT_TYPE)*129>>> // TODO: check this
+      dotprod_kernel<FLOAT_TYPE, 1024>
+      <<< gridSIZE, blockSIZE>>> // TODO: check this
       (order, local_mesh_info, a, b, odata);
 
-      cudaThreadSynchronize();
-      checkError( cudaGetLastError() );           
+      double tot_res(0), res(0);
 
-      FLOAT_TYPE res = thrust::reduce(d_thrust_pointer, d_thrust_pointer+(gridSIZE.x*gridSIZE.y));
+#ifdef USE_THRUST
 
-//      print_odata();
+      res = thrust::reduce(d_thrust_begin, d_thrust_end);
 
-#if 0
-      checkError ( cudaMemcpy( &res, // to
+#else
+
+      checkError ( cudaMemcpy( host_odata.data(), // to
                                odata,  // from
-                               sizeof(FLOAT_TYPE),
+                               host_odata.size()*sizeof(FLOAT_TYPE),
                                cudaMemcpyDeviceToHost) );
- 
-      std::cout<<"___  "<<res<<std::endl;
+
+      for(int i = 0; i < host_odata.size(); ++i)
+        res += host_odata[i];
+
 #endif
 
-      FLOAT_TYPE tot_res;
+ 
+#ifndef __DEBUG_NO_MPI__
+
       MPI_Allreduce(&res, &tot_res, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
+#else
+
+      tot_res = res;
+
+#endif
+
       return tot_res;
+
     }
   
-
-   void print_odata()
-   {
-     
-     int pid;
-     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
-
- //    if (pid == 0)
-{
-     std::vector<FLOAT_TYPE> tmp(gridSIZE.x*gridSIZE.y);
-
-     checkError ( cudaMemcpy( tmp.data(), // to
-                              odata,  // from
-                              tmp.size()*sizeof(FLOAT_TYPE),
-                              cudaMemcpyDeviceToHost) );
-
-     std::cerr<<"___  ";
-     for (int i = 0; i < tmp.size(); ++i) 
-       std::cerr<<tmp[i]<<"  ";
-     std::cerr<<std::endl;
- }
-   }
-
-
 };
 
 

@@ -16,6 +16,11 @@
   #include<mode_matrix_kernels.hpp>
 #endif
 
+#ifdef USE_PRECONDITIONER
+  #include<mode_matrix_kernels.hpp>
+#endif
+
+
 #include<conjugate_gradient_multigpu.hpp>
 
 /**
@@ -39,11 +44,16 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
 
     mode_vector<FLOAT_TYPE,int> output;
 
+    FLOAT_TYPE pen; 
+
 #ifdef USE_MODE_MATRIX
     mode_matrix<FLOAT_TYPE, int> d_volume_matrix; 
 #endif
 
-    FLOAT_TYPE pen; 
+#ifdef USE_PRECONDITIONER
+    mode_matrix<FLOAT_TYPE, int> d_prec_matrix; 
+#endif
+
 
 
     void compute_rhs( FLOAT_TYPE (*f)(FLOAT_TYPE, FLOAT_TYPE),
@@ -56,6 +66,13 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
                     FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE) );
 
 
+    dim3 volume_gridSIZE;
+    dim3 volume_blockSIZE;
+
+    dim3 flux_gridSIZE;
+    dim3 flux_blockSIZE;
+
+
     // +++++++++++++++++++++++++++ GCL stuff +++++++++++++++++++++++++++ 
 
     typedef GCL::layout_map<0,1,2> layoutmap;
@@ -64,17 +81,12 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
     pattern_type he;
     GCL::field_on_the_fly<FLOAT_TYPE, layoutmap, pattern_type::traits> field_gpu;
 
-    dim3 volume_gridSIZE;
-    dim3 volume_blockSIZE;
-
-    dim3 flux_gridSIZE;
-    dim3 flux_blockSIZE;
-
   public:
 
     FLOAT_TYPE max_err;
     FLOAT_TYPE L2_err;
     FLOAT_TYPE H1_err;
+    int iterations; 
 
     mode_vector<FLOAT_TYPE,int> d_u;
     mode_vector<FLOAT_TYPE,int> d_rhs;
@@ -89,7 +101,8 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
                            FLOAT_TYPE (*f)(FLOAT_TYPE, FLOAT_TYPE),
                            FLOAT_TYPE (*u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
                            FLOAT_TYPE (*dx_u_ex)(FLOAT_TYPE, FLOAT_TYPE), 
-                           FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE) )
+                           FLOAT_TYPE (*dy_u_ex)(FLOAT_TYPE, FLOAT_TYPE),
+                           FLOAT_TYPE _tol )
      : qt(_order+1),
        basis(_order),
        pen(100*_order*_order),
@@ -109,7 +122,7 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
       const int vec_noe = output.get_noe();
       const int blockD = 128;
       volume_gridSIZE = dim3( (vec_noe + blockD - 1)/blockD , order+1, order+1);
-      volume_blockSIZE = dim3(128, 1, 1); 
+      volume_blockSIZE = dim3(blockD, 1, 1); 
 
       const int dimx = mesh.device_info.get_dimx();
       const int dimy = mesh.device_info.get_dimy();
@@ -119,44 +132,37 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
       flux_gridSIZE = dim3( (dimx + blockDx - 1)/blockDx, (dimy + blockDy - 1)/blockDy, 1 );
       flux_blockSIZE = dim3( blockDx, blockDy, 1 );
 
- 
-#ifdef USE_MODE_MATRIX
-      host_laplacian_matrix<FLOAT_TYPE,int> h_volume_matrix(1, order);
-      d_volume_matrix = h_volume_matrix;
-#endif
-
 
       // initialize
       load_Dphi_table<FLOAT_TYPE>(order);
       load_lgl_quadrature_table<FLOAT_TYPE>(order);
 
+ 
+#ifdef USE_MODE_MATRIX
+      host_laplacian_matrix<FLOAT_TYPE,int> h_volume_matrix(1, order);
+      d_volume_matrix = h_volume_matrix;
+#endif
+#ifdef USE_PRECONDITIONER
+      host_preconditioner_matrix<FLOAT_TYPE,int> h_prec_matrix(1, order, pen);
+      d_prec_matrix = h_prec_matrix;
+#endif
+
+
       host_mode_vector<FLOAT_TYPE,int> h_xx(noe, order+1);
 
       setup_GCL();
-
-#if 0
-
-  int pid;
-  MPI_Comm_rank(MPI_COMM_WORLD, &pid);
-
-  const int n = mesh.local_dim();
-  for(int m1 = 0; m1< order+1; ++m1 )
-    for(int m2 = 0; m2< order+1; ++m2 )
-      for(int i = 0; i < n; ++i) // row
-        for(int j = 0; j < n; ++j) // col
-          h_xx(m1, m2, n*i + j) = 1; //FLOAT_TYPE(m1+1)/(m2+1);// (pid*10000) + (m1*1000) + (m2*100) + (n*i + j);
-
-   //   copy(h_xx, output);
-
-#endif
 
       compute_rhs(f, u_ex);
 
 #ifndef __MVM_MULTIGPU_TEST__
       copy(h_xx, d_u);
 
-      int it = conjugate_gradient_multigpu(*(this), d_u, d_rhs);
- //     _mvm(d_rhs);
+#ifdef USE_PRECONDITIONER
+      iterations = precoditioned_conjugate_gradient_multigpu(*(this), d_u, d_rhs, _tol);
+#else
+      iterations = conjugate_gradient_multigpu(*(this), d_u, d_rhs, _tol);
+#endif
+
       // copy back the solution 
       copy(d_u, solution);
 
@@ -168,6 +174,9 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
     {
 #ifdef USE_MODE_MATRIX
       d_volume_matrix.free();
+#endif
+#ifdef USE_PRECONDITIONER
+      d_prec_matrix.free();
 #endif
       d_rhs.free();
       d_u.free();
@@ -191,33 +200,49 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
       <<<volume_gridSIZE, volume_blockSIZE>>>
       ( order, input, output ); 
 #endif
+      #if 0
+
+       cudaError_t error = cudaGetLastError();
+       std::cout<<cudaGetErrorString(error)<<std::endl;
+
+      #endif
 
       local_flux_term6a<FLOAT_TYPE>
       <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output );
 
+      #if 0
+
+       error = cudaGetLastError();
+       std::cout<<cudaGetErrorString(error)<<std::endl;
+
+      #endif
+
       local_flux_term6b<FLOAT_TYPE>
       <<<flux_gridSIZE, flux_blockSIZE>>>
       ( order, mesh.device_info, input, output );
+
+      #if 0
+
+       error = cudaGetLastError();
+       std::cout<<cudaGetErrorString(error)<<std::endl;
+
+      #endif
+
+
+      cudaDeviceSynchronize();
 
       // use GCL in order to exchange output HALOS  
       he.pack(field_gpu);
       he.exchange();
       he.unpack(field_gpu);
 
-      #if 0
-
-       cudaError_t error = cudaGetLastError();
-       std::string lastError = cudaGetErrorString(error); 
-       std::cout<<lastError<<std::endl;
-
-      #endif
 
       return 0;
 
     }
 
-    mode_vector<FLOAT_TYPE,int> _mvm_output()
+    mode_vector<FLOAT_TYPE,int>& _mvm_output()
     {
       return output;
     }
@@ -228,6 +253,30 @@ class sipg_sem_2d_multigpu : public abs_mvm_multigpu<FLOAT_TYPE>
     {
       return dot_product(a, b);
     }
+
+
+
+    int _prec_mvm ( mode_vector<FLOAT_TYPE,int> input,
+                    mode_vector<FLOAT_TYPE,int> output ) const
+    {
+#ifdef USE_PRECONDITIONER
+
+      volume_mvm <FLOAT_TYPE, 1>
+      <<<volume_gridSIZE, volume_blockSIZE>>>
+      ( order, d_prec_matrix, input, output ); 
+
+    #if 0
+
+      cudaError_t error = cudaGetLastError();
+      std::string lastError = cudaGetErrorString(error); 
+      std::cout<<lastError<<std::endl;
+
+    #endif
+
+#endif
+      return 0;
+    }
+
 
 
     void setup_GCL()
