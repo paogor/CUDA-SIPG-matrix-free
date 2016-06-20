@@ -36,7 +36,8 @@ set( PERFORMANCE_TEST_EXECUTABLES
       constant_dof_change_degree_and_noe
       flux_kernels_performance_test
       one_iteration_of_sem_sipg_solved_on_gpu_test
-      volume_kernel_performance_test )
+      volume_kernel_performance_test 
+      mvm_performance_test )
 
 foreach( EXEC ${PERFORMANCE_TEST_EXECUTABLES} )
   cuda_add_executable( ${EXEC} performance_tests/${EXEC}.cu)

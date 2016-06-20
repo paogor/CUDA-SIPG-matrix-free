@@ -34,19 +34,20 @@ int main()
   std::cout<<"USE_PRECONDITIONER is ON"<<std::endl;
 #endif
 
-  const double toll = 1e-7;
+  const double toll = 1e-14;
 
   std::cout<<"toll: "<<toll<<std::endl;
 
 //  int degree = 2;
 
-  for (int degree = 4; degree < 5; ++degree)
+  for (int degree = 2; degree < 6; ++degree)
   {
-    const double penalty = 100*degree*degree;
+  
+    const double penalty = degree*degree;
     double L2_err_old(0), H1_err_old(0);  
 
 //  int dim = 640;
-  for (int dim = 120; dim < 2049 ; dim*=2)
+  for (int dim = 4; dim < 513 ; dim*=2)
   {
 
 

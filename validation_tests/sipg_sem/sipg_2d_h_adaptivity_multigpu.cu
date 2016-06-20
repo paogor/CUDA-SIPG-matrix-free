@@ -18,7 +18,7 @@
 
 #define USE_PRECONDITIONER 
 #define USE_MODE_MATRIX
-#define MPI_NODE_PER_EDGE 32 
+#define MPI_NODE_PER_EDGE 16 
 
 #define EXACT_SOLUTION_NO 5
 #include"../analytical_solutions.hpp"
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &pid);
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-  const double toll = 1e-7;
+  const double toll = 1e-14;
 
 
   if(pid == 0)
@@ -64,14 +64,14 @@ int main(int argc, char** argv)
   int coords[3] = {0, 0, 0};
   MPI_Cart_get(CartComm, 3, dims, period, coords);
 
-  int degree = 2;
-//  for (int degree = 3; degree < 5; ++degree)
+//  int degree = 2;
+  for (int degree = 2; degree < 4; ++degree)
   {
 
     double L2_err_old(0), H1_err_old(0);
 
 //  int dim = 8;
-    for (int dim = 32; dim < 2049; dim*=2)
+    for (int dim = 32; dim < 257; dim*=2)
     {
 
       CUDA_TIMER t;

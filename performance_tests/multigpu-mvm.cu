@@ -7,9 +7,9 @@
 #include<mpi.h>
 
 #define __MVM_MULTIGPU_TEST__
-#define MPI_NODE_PER_EDGE 8 
+#define MPI_NODE_PER_EDGE 4 
 
-#define EXACT_SOLUTION_NO 1
+#define EXACT_SOLUTION_NO 5 
 #include<../validation_tests/analytical_solutions.hpp>
 
 #include<sipg_sem_2d_multigpu.hpp>
@@ -46,22 +46,29 @@ int main(int argc, char** argv)
   MPI_Cart_get(CartComm, 3, dims, period, coords);
 
 
-
-  for (int degree = 2; degree < 17; degree*=2)
+ int degree = 8;
+//  for (int degree = 4; degree < 9; degree*=2)
   {
 
-    const int dim = 256;
-//    for (int dim = 128; dim < 2049; dim*=2)
+//    const int dim = 1024;
+    for (int dim = 128; dim < 1025; dim*=2)
     {
 
       CUDA_TIMER t;
       using namespace test_func;
       square_mesh_multigpu<double> sq_mesh( dim, MPI_NODE_PER_EDGE, coords[0], coords[1] ); 
-      sipg_sem_2d_multigpu<double> p(CartComm, degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
+      sipg_sem_2d_multigpu<double> p(CartComm, degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex, 1e-15);
 
+      p._mvm ( p.d_rhs );
       t.start();
-      for(int t=0; t < 100; ++t)
+      for(int t=0; t < 20; ++t)
+      {
         p._mvm ( p.d_rhs );
+        p._mvm ( p.d_rhs );
+        p._mvm ( p.d_rhs );
+        p._mvm ( p.d_rhs );
+        p._mvm ( p.d_rhs );
+      }
       t.stop();
 
       float mean_time(0);
@@ -76,12 +83,15 @@ int main(int argc, char** argv)
 
         std::cerr<<MPI_NODE_PER_EDGE*MPI_NODE_PER_EDGE<<"\t";
         std::cerr<<MPI_NODE_PER_EDGE*dim<<"\t"<<degree<<"\t";
+        std::cerr<<dim<<"\t";
         std::cerr<<mean_time;
         std::cerr<<std::endl;
 
       }
 
       sq_mesh.device_info.free();
+
+      MPI_Barrier(MPI_COMM_WORLD);
 
     }
   
