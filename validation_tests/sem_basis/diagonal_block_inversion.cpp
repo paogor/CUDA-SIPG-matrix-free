@@ -25,7 +25,7 @@ int inDEX(int N, int i1, int i2, int j1, int j2)
 }
 
 template<typename T>
-void diagonal_block (int N, std::vector<T> & a)
+void diagonal_block (int N, T penalty, std::vector<T> & a)
 {
 
   sem_function<T> b(N);
@@ -66,7 +66,7 @@ void diagonal_block (int N, std::vector<T> & a)
     } 
 
 
-  const T pen = 100*N*N;
+  const T pen = penalty;// 100*N*N;
   for (int i=0; i <= N; ++i)
   {
     a[ inDEX(N,N,i,N,i) ] += pen*qt.weight(i);
@@ -81,14 +81,14 @@ void diagonal_block (int N, std::vector<T> & a)
 
 
 template<typename T>
-int diagonal_matrix_inversion( int order )
+int diagonal_matrix_inversion(int order, T penalty)
 {
 
   const int nn = (order+1)*(order+1);
 
-  block_diagonal_preconditioner_2d prec(order); 
+  block_diagonal_preconditioner_2d prec(order, penalty); 
   std::vector<T> A(nn*nn, 0); 
-  diagonal_block<T>(order, A);
+  diagonal_block<T>(order, penalty, A);
  
   std::vector<T> A1 = A;
   lapacke_inv(A1.data(), nn);
@@ -143,8 +143,10 @@ int diagonal_matrix_inversion( int order )
 int main()
 {
 
+  const int N = 5;
+  const double pen = 100*N*N;
 
-  diagonal_matrix_inversion<double>( 5 );
+  diagonal_matrix_inversion<double>(N, pen);
 
   return 0;
 }

@@ -13,7 +13,7 @@
 #define EXACT_SOLUTION_NO 5
 #include"../analytical_solutions.hpp"
 
-#define USE_MODE_MATRIX
+//#define USE_MODE_MATRIX
 #include<sipg_sem_2d.hpp>
 
 
@@ -31,11 +31,17 @@ int main()
   const int dim = 16;
   square_mesh<double> sq_mesh(dim);
 
+  const double toll = 1e-14;
+
+  std::cout<<"toll: "<<toll<<std::endl;
+
   for (int degree = 1; degree < 15; ++degree)
   { 
 
+    const double penalty = degree*degree;
+
     using namespace test_func;
-    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex);
+    sipg_sem_2d<double> p(degree, sq_mesh, f, u_ex, dx_u_ex, dy_u_ex, penalty, toll);
 
     std::cout<<dim<<"\t"<<degree<<"\t";
     std::cout<<std::setw(12)<<p.H1_err<<"\t";

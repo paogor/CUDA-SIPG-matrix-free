@@ -33,9 +33,9 @@ target_link_libraries(lapack_wrapper lapacke) # lapacke lib must be in the searc
 ### PERFORMANCE tests
 
 set( PERFORMANCE_TEST_EXECUTABLES 
-      constant_dof_change_degree_and_noe
+  #    constant_dof_change_degree_and_noe
       flux_kernels_performance_test
-      one_iteration_of_sem_sipg_solved_on_gpu_test
+  #   one_iteration_of_sem_sipg_solved_on_gpu_test
       volume_kernel_performance_test 
       mvm_performance_test )
 
@@ -49,7 +49,8 @@ endforeach()
 
 set( SIPG_VALIDATION_EXECUTABLES
       sipg_2d_h_adaptivity
-      sipg_2d_p_adaptivity )
+      sipg_2d_p_adaptivity
+)
 
 foreach( EXEC ${SIPG_VALIDATION_EXECUTABLES} )
   cuda_add_executable( ${EXEC} validation_tests/sipg_sem/${EXEC}.cu)

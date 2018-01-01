@@ -1,7 +1,7 @@
 #define __DEBUG_NO_MPI__
 
 #include<iostream>
-#include<dotproduct_multigpu.old2>
+#include<dotproduct_multigpu.hpp> //old2>
 #include<build_square_mesh.hpp>
 
 
